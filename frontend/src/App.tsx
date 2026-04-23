@@ -10,6 +10,8 @@ interface PulseState {
   status: string
   current_task: string | null
   tasks_queued: number
+  model: string
+  provider: string
 }
 
 export default function App() {

@@ -18,7 +18,7 @@ LOG_FILE = STATE_DIR / "pulse.jsonl"
 
 HOST = os.getenv("HERMES_NATIVE_HOST", "127.0.0.1")
 PORT = int(os.getenv("HERMES_NATIVE_PORT", "8789"))
-FE_DIST = Path(__file__).parent / "frontend" / "dist"
+FE_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 def now():
     return datetime.now(timezone.utc).isoformat()
