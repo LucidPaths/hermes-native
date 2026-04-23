@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import PulseOrb from './components/PulseOrb'
 import StatusPanel from './components/StatusPanel'
 import TaskStream from './components/TaskStream'
+import ChatPanel from './components/ChatPanel'
 
 interface PulseState {
   last_pulse: string | null
@@ -45,6 +46,7 @@ export default function App() {
           <StatusPanel state={state} />
         </section>
         <section className="right">
+          <ChatPanel />
           <TaskStream />
         </section>
       </main>

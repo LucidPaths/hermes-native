@@ -5,6 +5,7 @@ aiohttp: REST API + SSE on :8789
 import asyncio
 import json
 import os
+import subprocess
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -176,6 +177,30 @@ async def events(request):
 async def health(_):
     return web.json_response({"ok": True, "version": state["version"], "status": state["status"]})
 
+async def chat_post(request):
+    body = await request.json()
+    msg = body.get("message", "").strip()
+    if not msg:
+        return web.json_response({"error": "empty message"}, status=400)
+    try:
+        result = subprocess.run(
+            ["/home/lucid/.local/bin/hermes", "chat", "-q", msg, "-Q", "--yolo", "--accept-hooks", "--pass-session-id"],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(Path.home() / "workspace"),
+            env={**dict(os.environ), "TERM": "dumb", "NO_COLOR": "1", "HERMES_ACCEPT_HOOKS": "1"},
+        )
+        response_text = (result.stdout or "(no output)").strip().split("\n")[-1]  # last line only
+        # Append to conversation log
+        log = {"role": "user", "msg": msg}, {"role": "assistant", "msg": response_text}
+        return web.json_response({
+            "response": response_text,
+            "session_id": result.stderr.strip().replace("session_id: ", "") if "session_id" in result.stderr else None,
+        })
+    except subprocess.TimeoutExpired:
+        return web.json_response({"response": "Hermes timed out (120s). Try a shorter query."}, status=504)
+    except Exception as e:
+        return web.json_response({"response": f"Error: {e}"}, status=500)
+
 app = web.Application()
 app.router.add_get("/", health)
 app.router.add_get("/health", health)
@@ -184,8 +209,26 @@ app.router.add_patch("/api/state", state_patch)
 app.router.add_post("/api/pulse", pulse_post)
 app.router.add_post("/api/tasks", task_post)
 app.router.add_post("/api/tasks/complete", task_complete)
+app.router.add_post("/api/chat", chat_post)
 app.router.add_get("/api/history", history_get)
 app.router.add_get("/events", events)
+
+# CORS middleware for dev
+from aiohttp.web_middlewares import middleware
+
+@middleware
+async def cors_middleware(request, handler):
+    if request.method == "OPTIONS":
+        resp = web.Response()
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, OPTIONS"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        return resp
+    resp = await handler(request)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+app.middlewares.append(cors_middleware)
 
 # static from FE dist if it exists
 if FE_DIST.exists():
