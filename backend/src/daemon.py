@@ -101,6 +101,46 @@ async def pulse_post(request):
     s = await pulse()
     return web.json_response(s)
 
+async def _run_hermes_task(task_id: str, desc: str):
+    async with state_lock:
+        for t in state["task_queue"]:
+            if t["id"] == task_id:
+                t["status"] = "running"
+                state["status"] = "working"
+                save_state(state)
+                break
+    await hub.push({"type": "state", "data": dict(state)})
+    
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "/home/lucid/.local/bin/hermes", "chat", "-q", desc, "-Q", "--yolo", "--accept-hooks", "--pass-session-id", "--source", "native-task",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            cwd=str(Path.home() / "workspace"),
+            env={**dict(os.environ), "TERM": "dumb", "NO_COLOR": "1", "HERMES_ACCEPT_HOOKS": "1"},
+        )
+        stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
+        response_text = stdout.decode().strip().split("\n")[-1]
+        
+        async with state_lock:
+            for t in state["task_queue"]:
+                if t["id"] == task_id:
+                    t["status"] = "done"
+                    t["completed"] = now()
+                    t["result"] = response_text[:500]
+                    break
+            state["status"] = "idle" if not [t for t in state["task_queue"] if t["status"] in ("pending","running")] else "working"
+            save_state(state)
+    except Exception as e:
+        async with state_lock:
+            for t in state["task_queue"]:
+                if t["id"] == task_id:
+                    t["status"] = "error"
+                    t["result"] = str(e)[:300]
+                    break
+            state["status"] = "idle" if not [t for t in state["task_queue"] if t["status"] in ("pending","running")] else "working"
+            save_state(state)
+    await hub.push({"type": "state", "data": dict(state)})
+
 async def task_post(request):
     body = await request.json()
     async with state_lock:
@@ -114,6 +154,8 @@ async def task_post(request):
         state["status"] = "working" if state["task_queue"] else "idle"
         save_state(state)
     await hub.push({"type": "task", "data": task})
+    # Spawn hermes in background
+    asyncio.create_task(_run_hermes_task(task["id"], task["desc"]))
     return web.json_response(task)
 
 async def task_complete(request):
