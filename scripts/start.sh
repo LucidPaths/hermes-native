@@ -1,29 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Hermes Native — One-port production launcher
+# Serves frontend static + API on the same port.
+
+export HERMES_NATIVE_HOST="${HERMES_NATIVE_HOST:-0.0.0.0}"
+export HERMES_NATIVE_PORT="${HERMES_NATIVE_PORT:-8789}"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(dirname "$SCRIPT_DIR")"
-BACKEND_PID=""
 
-cleanup() {
-  echo "[hermes-native] shutting down..."
-  if [ -n "${BACKEND_PID:-}" ] && kill -0 "$BACKEND_PID" 2>/dev/null; then
-    kill "$BACKEND_PID" 2>/dev/null && wait "$BACKEND_PID" 2>/dev/null || true
-  fi
-  echo "[hermes-native] done."
-}
-trap cleanup INT TERM EXIT
+cd "$REPO_ROOT"
 
-mkdir -p ~/.hermes-native/state
-
-echo "[hermes-native] starting backend @ :8789..."
-cd "$REPO_ROOT/backend/src"
-python3 daemon.py &
-BACKEND_PID=$!
-sleep 2
-if ! kill -0 "$BACKEND_PID" 2>/dev/null; then
-  echo "[hermes-native] backend failed. install deps: pip install -r backend/requirements.txt"
-  exit 1
+# Ensure frontend is built
+if [ ! -d "frontend/dist" ]; then
+  echo "[hermes-native] building frontend..."
+  cd frontend
+  npm install
+  npm run build
+  cd "$REPO_ROOT"
 fi
-echo "[hermes-native] backend ready. serving frontend @ http://127.0.0.1:8789/index.html"
+
+# Ensure backend deps
+python3 -c "import aiohttp" 2>/dev/null || {
+  echo "[hermes-native] installing backend deps..."
+  pip install -r backend/requirements.txt
+}
+
+echo "[hermes-native] starting on http://$HERMES_NATIVE_HOST:$HERMES_NATIVE_PORT"
+echo "[hermes-native] open:   http://$(hostname -I | awk '{print $1}'):$HERMES_NATIVE_PORT"
 echo "[hermes-native] press Ctrl+C to stop"
-wait
+
+exec python3 "$REPO_ROOT/backend/src/daemon.py"
