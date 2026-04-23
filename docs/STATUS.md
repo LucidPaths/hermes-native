@@ -1,52 +1,65 @@
 # Status — Hermes Native
 
-Current: v0.1.0 (pre-release)
+Current: v0.3.3
 
 ## What's Built ✅
 
-- [x] GitHub repo: `LucidPaths/hermes-native`
-- [x] Heartbeat cron: `hermes-native-heartbeat` firing every 15m
-- [x] Backend daemon (`backend/src/daemon.py`): state keeper, REST API, SSE stream
-- [x] Frontend skeleton (Vite + React + TS):
-  - App.tsx dashboard
-  - PulseOrb visual heartbeat
-  - StatusPanel live state
-  - TaskStream enqueue + completion
-  - Dark void aesthetic
-- [x] Styles: `frontend/src/styles/index.css` (~250 lines)
-- [x] Scripts: `scripts/start.sh`
+- [x] GitHub repo: `LucidPaths/hermes-native` — 7 commits
+- [x] Backend daemon (`backend/src/daemon.py`): aiohttp on :8789
+  - State keeper (JSON file persistence)
+  - REST API: `/health`, `/api/state`, `/api/pulse`, `/api/tasks`, `/api/tasks/complete`, `/api/chat`, `/api/history`
+  - SSE `/events` (live state push)
+  - CORS middleware for dev
+  - **Async task invoker** — spawns `hermes chat -q` via `asyncio.subprocess`, tracks `pending → running → done`
+  - **Hermes agent bridge** — chat endpoint that invokes CLI, returns clean text
+- [x] Frontend (Vite + React + TypeScript):
+  - `App.tsx` — responsive grid (desktop: sidebar + content, mobile: stacked)
+  - `PulseOrb.tsx` — animated CSS orb with `idle/working/error` color states
+  - `StatusPanel.tsx` — live state display (model, pulses, queue depth, last pulse)
+  - `TaskStream.tsx` — enqueue tasks, watch status transitions, result display
+  - `ChatPanel.tsx` — full chat interface with hermes agent
+  - Dark void theme (CSS variables, radial gradient, monospace + sans-serif)
+  - Mobile responsive via `@media (max-width: 768px)`
+- [x] Build system:
+  - `npm run build` → zero errors
+  - Static serving from daemon (single port)
+  - `./scripts/start.sh` — production launcher with auto-build
+- [x] Heartbeat cron: `hermes-native-heartbeat` every 15m (job ID: `b7e594c34aaf`)
+- [x] Session interrupt recovery skill
 
-## Working During User Absence
+## End-to-End Verified ✅
 
-- Heartbeat ran every 15m
-- Task log populated at `~/.hermes-native/state/tasklog.md`
-- Daemon wrote pulse history to `~/.hermes-native/state/pulse.jsonl`
+| Feature | Test | Result |
+|---------|------|--------|
+| Chat | "what is 5*7" | "35" |
+| Task async | "capital of France" | "Paris" |
+| Task result | "capital of Japan" | "Tokyo" |
+| SSE updates | task status transitions | live |
+| Mobile DOM | chrome inspector 375px | renders stacked |
+| Phone LAN | `172.21.170.236:8788` | accessible |
 
-## What's Missing ⚠️
+## Running
 
-- [ ] Frontend dependency install + build (npm install)
-- [ ] Backend dependency install + test run (aiohttp)
-- [ ] Integration test: `npm run dev` + `python3 backend/src/daemon.py`
-- [ ] Mobile responsive polish (tablet okay, phone could be tighter)
-- [ ] Chat interface (beyond state display)
-- [ ] Hermes-agent bridge (MCP or direct tool call)
-- [ ] Desktop packaging (electron/tauri when rust available)
-- [ ] Phone-accessible deployment (caddy reverse proxy or tailscale)
+```bash
+cd /home/lucid/workspace/hermes-native
+python3 backend/src/daemon.py
+# open http://localhost:8789 (or http://YOUR_IP:8789 on phone)
+```
 
-## Next Sprint
+Defaults: `HERMES_NATIVE_HOST=0.0.0.0`, `PORT=8789`
 
-1. Get `npm install` working, verify build
-2. Run backend, hit `/health`
-3. Wire frontend SSE to backend events
-4. Add a minimal chat route that proxies to hermes-agent
-5. Polish responsive grid
+Serves backend API + frontend static from one port.
+
+## Handoff
+
+See `docs/HANDOFF.md` for full architecture, test log, and future sprints.
 
 ## Lattice Check
 
 | # | Principle | Status |
 |---|-----------|--------|
-| P1 Bridges | ✅ Thin daemon, no fork |
-| P2 Agnostic | ✅ Any model via config |
-| P3 Simplicity | ✅ Pillaged hermes-webui patterns |
-| P4 Observable | ✅ Every pulse logged + SSE |
-| P9 Compounding | ✅ Task queue + history |
+| P1 Bridges | ✅ Thin daemon, no fork of hermes-agent |
+| P2 Agnostic | ✅ Any model hermes supports |
+| P3 Simplicity | ✅ Pillaged webui patterns + hermes CLI |
+| P4 Observable | ✅ Every pulse logged + SSE + task results |
+| P9 Compounding | ✅ Task queue + task results accumulate |
