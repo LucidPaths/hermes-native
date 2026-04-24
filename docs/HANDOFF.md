@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.9.0
+**Version:** v0.10.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -21,7 +21,19 @@ cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 ```
 
-### v0.9.0 (current)
+### v0.10.0 (current)
+- **Chat Sessions** — isolate conversations into named sessions persisted in SQLite
+  - `sessions` table with id, title, timestamps, metadata
+  - API: `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}`, `DELETE /api/sessions/{id}`
+  - Messages saved with `session_id`; session-scoped loading
+  - ChatPanel sidebar: switch sessions, create new, delete, auto-title from first message
+- **Full-Text Search** — SQLite FTS5 over message contents with fallback LIKE
+  - API: `GET /api/search?q=...&limit=...`
+  - Frontend: Ctrl+F opens global search overlay; live debounced results
+  - FTS5 auto-created + backfilled on DB migration
+- **DB Stats expanded** — `/api/stats` now includes `sessions` count
+
+### v0.9.0
 - **Plugin system wired** — `pre_chat`, `post_chat`, `pre_task`, `post_task`, `on_pulse`, `on_mood_change` all fire
   - Auto-discovery from `~/.hermes-native/plugins/*.py`
   - Sample: `plugins/logger.py`

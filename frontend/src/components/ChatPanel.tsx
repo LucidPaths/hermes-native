@@ -8,6 +8,21 @@ interface APIMessage {
   created: string
 }
 
+interface Session {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+interface SearchResult {
+  id: number
+  role: string
+  content: string
+  created: string
+  session_id?: string
+}
+
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
@@ -23,7 +38,7 @@ interface WSMessage {
 
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes Native chat — streaming v0.6.0', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — v0.10.0', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -32,13 +47,41 @@ export default function ChatPanel() {
   const wsRef = useRef<WebSocket | null>(null)
   const streamingRef = useRef(false)
 
-  // Load persistent history
+  // Sessions
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [currentSession, setCurrentSession] = useState<string | null>(null)
+  const [sessionsLoaded, setSessionsLoaded] = useState(false)
+
+  // Search
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const searchInputRef = useRef<HTMLInputElement>(null)
+
+  // Load sessions
   useEffect(() => {
-    fetch('/api/chat/history?limit=50')
+    fetch('/api/sessions')
       .then(r => r.json())
-      .then((data: APIMessage[]) => {
-        if (Array.isArray(data) && data.length > 0) {
-          const loaded: Message[] = data.map(m => ({
+      .then(data => {
+        const list: Session[] = data.sessions || []
+        setSessions(list)
+        setSessionsLoaded(true)
+        if (list.length > 0 && !currentSession) {
+          setCurrentSession(list[0].id)
+        }
+      })
+      .catch(() => setSessionsLoaded(true))
+  }, [])
+
+  // Load messages when session changes (or load all if no session)
+  const loadMessages = (sid: string | null) => {
+    const url = sid ? `/api/sessions/${sid}` : '/api/chat/history?limit=50'
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        const raw: APIMessage[] = sid ? (data.messages || []) : data
+        if (Array.isArray(raw) && raw.length > 0) {
+          const loaded: Message[] = raw.map(m => ({
             role: m.role as 'user'|'assistant'|'system',
             content: m.content,
             ts: m.created,
@@ -48,15 +91,112 @@ export default function ChatPanel() {
             const boot = prev.filter(p => p.ts === 'boot')
             return [...boot, ...loaded]
           })
+        } else {
+          setMessages(prev => prev.filter(p => p.ts === 'boot'))
         }
         setLoaded(true)
       })
       .catch(() => setLoaded(true))
-  }, [])
+  }
+
+  useEffect(() => {
+    if (currentSession || sessionsLoaded) {
+      loadMessages(currentSession)
+    }
+  }, [currentSession])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, busy])
+
+  const createSession = async () => {
+    const title = input.trim() || 'New Session'
+    try {
+      const resp = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+      const data = await resp.json()
+      if (data.id) {
+        setSessions(prev => [data, ...prev])
+        setCurrentSession(data.id)
+        setInput('')
+        setMessages(prev => prev.filter(p => p.ts === 'boot'))
+      }
+    } catch (e) {
+      console.error('create session', e)
+    }
+  }
+
+  const deleteSession = async (sid: string) => {
+    if (!window.confirm('Delete this session and its messages?')) return
+    try {
+      await fetch(`/api/sessions/${sid}`, { method: 'DELETE' })
+      setSessions(prev => prev.filter(s => s.id !== sid))
+      if (currentSession === sid) {
+        const remaining = sessions.filter(s => s.id !== sid)
+        setCurrentSession(remaining.length > 0 ? remaining[0].id : null)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  const renameSession = async (sid: string, title: string) => {
+    try {
+      await fetch(`/api/sessions/${sid}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+      setSessions(prev => prev.map(s => s.id === sid ? { ...s, title } : s))
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  // Search
+  useEffect(() => {
+    if (!searchOpen) return
+    if (!searchQuery.trim()) {
+      setSearchResults([])
+      return
+    }
+    const t = setTimeout(() => {
+      fetch(`/api/search?q=${encodeURIComponent(searchQuery)}&limit=30`)
+        .then(r => r.json())
+        .then(data => setSearchResults(data.results || []))
+        .catch(() => {})
+    }, 300)
+    return () => clearTimeout(t)
+  }, [searchQuery, searchOpen])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        setSearchOpen(true)
+        setTimeout(() => searchInputRef.current?.focus(), 50)
+      }
+      if (e.key === 'Escape') {
+        setSearchOpen(false)
+        wsRef.current?.close()
+        setBusy(false)
+        streamingRef.current = false
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        clearChat()
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        createSession()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [input])
 
   const send = async () => {
     if (!input.trim() || busy || streamingRef.current) return
@@ -66,7 +206,15 @@ export default function ChatPanel() {
     setBusy(true)
     streamingRef.current = true
 
-    // Try WebSocket first
+    // Update session title from first message if still 'Untitled' or default
+    if (currentSession) {
+      const s = sessions.find(s => s.id === currentSession)
+      if (s && (s.title === 'Untitled' || s.title === 'New Session')) {
+        const autoTitle = userMsg.content.slice(0, 40)
+        renameSession(currentSession, autoTitle || 'Session')
+      }
+    }
+
     const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/chat`
     let ws = new WebSocket(wsUrl)
     wsRef.current = ws
@@ -74,7 +222,7 @@ export default function ChatPanel() {
     let streamingIndex = -1
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ message: userMsg.content }))
+      ws.send(JSON.stringify({ message: userMsg.content, session_id: currentSession }))
     }
 
     ws.onmessage = (event) => {
@@ -133,7 +281,7 @@ export default function ChatPanel() {
       const resp = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg.content }),
+        body: JSON.stringify({ message: userMsg.content, session_id: currentSession }),
       })
       const data = await resp.json()
       const assistantMsg: Message = {
@@ -172,57 +320,89 @@ export default function ChatPanel() {
     }
   }
 
-  // Keyboard shortcuts
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        wsRef.current?.close()
-        setBusy(false)
-        streamingRef.current = false
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault()
-        clearChat()
-      }
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [])
-
   return (
-    <div className="chat-area">
-      <h2>
-        Chat
-        {loaded && <span className="tag">streaming</span>}
-        <button className="btn-ghost" onClick={clearChat} title="Clear chat (Ctrl+K)" style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px' }}>Clear</button>
-      </h2>
-      <div className="chat-history">
-        {messages.map((m, i) => (
-          <div key={i} className={`chat-msg chat-${m.role}`}>
-            <span className="chat-role">{m.role === 'system' ? '◈' : m.role === 'user' ? '◉' : '🜹'}</span>
-            <div className="chat-bubble">
-              <span className={`chat-body ${m.streaming ? 'streaming' : ''}`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
-              <span className="chat-ts">{formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}</span>
+    <div className="chat-wrap">
+      {searchOpen && (
+        <div className="search-overlay" onClick={() => setSearchOpen(false)}>
+          <div className="search-box" onClick={e => e.stopPropagation()}>
+            <input
+              ref={searchInputRef}
+              placeholder="Search messages..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="search-input"
+            />
+            <div className="search-results">
+              {searchResults.length === 0 && searchQuery && <div className="search-empty">No results</div>}
+              {searchResults.map(r => (
+                <div key={r.id} className="search-result">
+                  <span className="sr-role">{r.role === 'user' ? '◉' : '🜹'}</span>
+                  <span className="sr-content">{r.content.slice(0, 120)}</span>
+                  <span className="sr-ts">{new Date(r.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              ))}
             </div>
+            <div className="search-hint">ESC to close · Ctrl+N new session</div>
           </div>
-        ))}
-        {busy && !streamingRef.current && (
-          <div className="chat-msg chat-system">
-            <span className="chat-role blink">🜹</span>
-            <span className="chat-body">thinking...</span>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-      <div className="chat-input">
-        <input
-          placeholder="Say something..."
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
-          disabled={busy}
-        />
-        <button onClick={send} disabled={busy}>{busy ? '◐' : '🜹'}</button>
+        </div>
+      )}
+
+      <aside className="chat-sidebar">
+        <div className="cs-header">
+          <span className="cs-title">Sessions</span>
+          <button className="cs-new" onClick={createSession} title="New session (Ctrl+N)">+</button>
+        </div>
+        <div className="cs-list">
+          {sessions.map(s => (
+            <div
+              key={s.id}
+              className={`cs-item ${currentSession === s.id ? 'active' : ''}`}
+              onClick={() => setCurrentSession(s.id)}
+            >
+              <div className="cs-title-text">{s.title}</div>
+              <div className="cs-meta">{new Date(s.updated_at).toLocaleDateString()}</div>
+              <button className="cs-del" onClick={e => { e.stopPropagation(); deleteSession(s.id); }} title="Delete">×</button>
+            </div>
+          ))}
+          {sessions.length === 0 && <div className="cs-empty">No sessions yet</div>}
+        </div>
+        <button className="cs-search-btn" onClick={() => setSearchOpen(true)}>🔍 Search (Ctrl+F)</button>
+      </aside>
+
+      <div className="chat-area">
+        <h2>
+          Chat
+          {loaded && <span className="tag">streaming</span>}
+          <button className="btn-ghost" onClick={clearChat} title="Clear chat (Ctrl+K)" style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px' }}>Clear</button>
+        </h2>
+        <div className="chat-history">
+          {messages.map((m, i) => (
+            <div key={i} className={`chat-msg chat-${m.role}`}>
+              <span className="chat-role">{m.role === 'system' ? '◈' : m.role === 'user' ? '◉' : '🜹'}</span>
+              <div className="chat-bubble">
+                <span className={`chat-body ${m.streaming ? 'streaming' : ''}`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
+                <span className="chat-ts">{formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}</span>
+              </div>
+            </div>
+          ))}
+          {busy && !streamingRef.current && (
+            <div className="chat-msg chat-system">
+              <span className="chat-role blink">🜹</span>
+              <span className="chat-body">thinking...</span>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+        <div className="chat-input">
+          <input
+            placeholder={currentSession ? 'Say something...' : 'Start a new session...'}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+            disabled={busy}
+          />
+          <button onClick={send} disabled={busy}>{busy ? '◐' : '🜹'}</button>
+        </div>
       </div>
     </div>
   )

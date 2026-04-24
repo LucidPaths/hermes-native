@@ -53,7 +53,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.9.0"  # always use current version
+            data["version"] = "0.10.0"  # always use current version
             return data
         except Exception:
             pass
@@ -412,6 +412,7 @@ def _get_cached_mood():
 async def chat_post(request):
     body = await request.json()
     msg = body.get("message", "").strip()
+    session_id = body.get("session_id", "").strip() or None
     if not msg:
         return web.json_response({"error": "empty message"}, status=400)
     registry = _get_plugins()
@@ -432,8 +433,8 @@ async def chat_post(request):
         # Persist to DB
         if db:
             try:
-                db.save_message("user", msg, metadata={"source": "native"})
-                db.save_message("assistant", response_text, metadata={
+                db.save_message("user", msg, session_id=session_id, metadata={"source": "native"})
+                db.save_message("assistant", response_text, session_id=session_id, metadata={
                     "source": "native",
                     "session_id": result.stderr.strip().replace("session_id: ", "") if "session_id" in result.stderr else None
                 })
@@ -485,13 +486,14 @@ async def ws_chat(request):
         if msg.type == web.WSMsgType.TEXT:
             body = json.loads(msg.data)
             user_msg = body.get("message", "").strip()
+            ws_session_id = body.get("session_id", "").strip() or None
             if not user_msg:
                 await ws.send_str(json.dumps({"type": "error", "text": "empty"}))
                 continue
             
             # Persist user message
             if db:
-                try: db.save_message("user", user_msg, metadata={"source": "native"})
+                try: db.save_message("user", user_msg, session_id=ws_session_id, metadata={"source": "native"})
                 except Exception as e: print(f"[db] ws user msg error: {e}")
             
             # Plugin: pre_chat
@@ -531,7 +533,7 @@ async def ws_chat(request):
                 
                 # Persist full response + plugin
                 if db:
-                    try: db.save_message("assistant", full_text, metadata={"source": "native", "session_id": session_id})
+                    try: db.save_message("assistant", full_text, session_id=ws_session_id, metadata={"source": "native", "session_id": session_id})
                     except Exception as e: print(f"[db] ws assistant msg error: {e}")
                 if registry:
                     try: registry.run("post_chat", message=user_msg, response=full_text, state=dict(state))
@@ -578,6 +580,77 @@ async def tokens_get(request):
     total = db.get_total_tokens() if db else 0
     return web.json_response({"total_tokens": total})
 
+# ── Sessions ──
+
+async def sessions_get(request):
+    """List chat sessions."""
+    try:
+        limit = int(request.query.get("limit", "50"))
+        sessions = db.get_sessions(limit=limit) if db else []
+        return web.json_response({"sessions": sessions})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def session_post(request):
+    """Create a new session."""
+    try:
+        body = await request.json()
+        sid = body.get("id") or f"s{int(time.time()*1000)}"
+        title = body.get("title", "Untitled")
+        if db:
+            db.create_session(sid, title=title)
+        return web.json_response({"id": sid, "title": title, "created_at": db.now_iso() if db else now()})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def session_get(request):
+    """Get a single session with its messages."""
+    try:
+        sid = request.match_info["id"]
+        session = db.get_session(sid) if db else None
+        if not session:
+            return web.json_response({"error": "not found"}, status=404)
+        msgs = db.get_messages_by_session(sid, limit=200) if db else []
+        return web.json_response({"session": session, "messages": msgs})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def session_delete(request):
+    """Delete a session and its messages."""
+    try:
+        sid = request.match_info["id"]
+        if db:
+            db.delete_session(sid)
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def session_rename(request):
+    """Rename a session."""
+    try:
+        sid = request.match_info["id"]
+        body = await request.json()
+        title = body.get("title", "Untitled")
+        if db:
+            db.update_session(sid, title=title)
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+# ── Search ──
+
+async def search_get(request):
+    """Full-text search over messages."""
+    try:
+        q = request.query.get("q", "").strip()
+        limit = int(request.query.get("limit", "50"))
+        if not q:
+            return web.json_response({"query": q, "results": []})
+        results = db.search_messages(q, limit=limit) if db else []
+        return web.json_response({"query": q, "results": results})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 # ── Routes ──
 app = web.Application()
 app.router.add_get("/", index)
@@ -601,6 +674,13 @@ app.router.add_get("/api/stats", stats_get)
 app.router.add_get("/api/tunnel", tunnel_status)
 
 app.router.add_get("/api/tokens", tokens_get)
+
+app.router.add_get("/api/sessions", sessions_get)
+app.router.add_post("/api/sessions", session_post)
+app.router.add_get("/api/sessions/{id}", session_get)
+app.router.add_delete("/api/sessions/{id}", session_delete)
+app.router.add_patch("/api/sessions/{id}", session_rename)
+app.router.add_get("/api/search", search_get)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware

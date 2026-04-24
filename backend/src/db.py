@@ -69,10 +69,26 @@ CREATE TABLE IF NOT EXISTS pulses (
 
 -- timeline_view: convenience for unified feed display
 -- materialized by query, not stored
+
+-- sessions: chat session grouping
+CREATE TABLE IF NOT EXISTS sessions (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL DEFAULT 'Untitled',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    metadata TEXT               -- JSON blob
+);
+
+-- messages FTS5 index for full-text search
+CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
+    content, role, session_id,
+    content='messages',
+    content_rowid='id'
+);
 """
 
 def migrate_db():
-    """Lightweight migrations: add missing columns, then init schema."""
+    """Lightweight migrations: add missing columns/tables, then init schema."""
     conn = sqlite3.connect(DB_PATH, timeout=10)
     cursor = conn.execute("PRAGMA table_info(messages)")
     columns = {row[1] for row in cursor.fetchall()}
@@ -80,6 +96,36 @@ def migrate_db():
         print("[db] migrating: adding messages.tokens column")
         conn.execute("ALTER TABLE messages ADD COLUMN tokens INTEGER DEFAULT 0")
         conn.commit()
+    # Check for sessions table
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    if "sessions" not in tables:
+        print("[db] migrating: adding sessions table")
+        conn.execute("""
+            CREATE TABLE sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL DEFAULT 'Untitled',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                metadata TEXT
+            )
+        """)
+        conn.commit()
+    if "messages_fts" not in tables:
+        print("[db] migrating: adding messages_fts FTS5 index")
+        try:
+            conn.execute("""
+                CREATE VIRTUAL TABLE messages_fts USING fts5(
+                    content, role, session_id,
+                    content='messages',
+                    content_rowid='id'
+                )
+            """)
+            conn.commit()
+            # Populate initial index
+            conn.execute("INSERT INTO messages_fts(rowid, content, role, session_id) SELECT id, content, role, session_id FROM messages")
+            conn.commit()
+        except Exception as e:
+            print(f"[db] fts5 migration error (fts5 may not be available): {e}")
     conn.close()
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.executescript(SCHEMA)
@@ -216,8 +262,106 @@ def get_db_stats():
     msgs = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
     tasks = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
     pulses = conn.execute("SELECT COUNT(*) FROM pulses").fetchone()[0]
+    sessions = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
     conn.close()
-    return {"messages": msgs, "tasks": tasks, "pulses": pulses, "db_path": str(DB_PATH)}
+    return {"messages": msgs, "tasks": tasks, "pulses": pulses, "sessions": sessions, "db_path": str(DB_PATH)}
+
+# ── Sessions ────────────────────────
+
+def create_session(session_id: str, title: str = None, metadata: dict = None):
+    conn = sqlite3.connect(DB_PATH)
+    title = title or "Untitled"
+    created = now_iso()
+    conn.execute(
+        "INSERT INTO sessions (id, title, created_at, updated_at, metadata) VALUES (?, ?, ?, ?, ?)",
+        (session_id, title, created, created, json.dumps(metadata or {}))
+    )
+    conn.commit()
+    conn.close()
+
+def get_sessions(limit: int = 100):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ?", (limit,)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def get_session(session_id: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+def update_session(session_id: str, title: str = None):
+    conn = sqlite3.connect(DB_PATH)
+    fields = []
+    params = []
+    if title is not None:
+        fields.append("title = ?")
+        params.append(title)
+    fields.append("updated_at = ?")
+    params.append(now_iso())
+    params.append(session_id)
+    conn.execute(f"UPDATE sessions SET {', '.join(fields)} WHERE id = ?", params)
+    conn.commit()
+    conn.close()
+
+def delete_session(session_id: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+    conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+    conn.commit()
+    conn.close()
+
+def get_messages_by_session(session_id: str, limit: int = 100):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        "SELECT * FROM messages WHERE session_id = ? ORDER BY created ASC LIMIT ?",
+        (session_id, limit)
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# ── Full-Text Search ────────────────────────
+
+def search_messages(query: str, limit: int = 50):
+    """Search messages via FTS5. Falls back to LIKE if FTS5 unavailable."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    # Try FTS5 first
+    try:
+        rows = conn.execute(
+            """SELECT m.id, m.role, m.content, m.created, m.session_id
+               FROM messages_fts fts
+               JOIN messages m ON m.id = fts.rowid
+               WHERE messages_fts MATCH ?
+               ORDER BY rank
+               LIMIT ?""",
+            (query, limit)
+        ).fetchall()
+    except Exception:
+        # Fallback to LIKE
+        rows = conn.execute(
+            "SELECT id, role, content, created, session_id FROM messages WHERE content LIKE ? ORDER BY created DESC LIMIT ?",
+            (f"%{query}%", limit)
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+def rebuild_fts():
+    """Rebuild the FTS5 index. Call after bulk inserts."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute("INSERT INTO messages_fts(messages_fts) VALUES('rebuild')")
+        conn.commit()
+    except Exception as e:
+        print(f"[db] fts rebuild error: {e}")
+    finally:
+        conn.close()
 
 # ── Clear ────────────────────────
 

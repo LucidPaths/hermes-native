@@ -281,12 +281,192 @@ html, body, #root {
   margin-bottom: 16px;
 }
 
+/* ===== CHAT WRAPPER WITH SIDEBAR ===== */
+.chat-wrap {
+  display: flex;
+  height: 100%;
+  gap: 0;
+}
+
+.chat-sidebar {
+  width: 200px;
+  min-width: 160px;
+  max-width: 260px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 8px;
+  background: rgba(13,13,18,0.5);
+  flex-shrink: 0;
+}
+
+.cs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.cs-new {
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
+  color: var(--accent);
+  width: 24px; height: 24px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+.cs-new:hover { background: var(--accent); color: var(--void); }
+
+.cs-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cs-item {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+  border: 1px solid transparent;
+  font-size: 12px;
+}
+.cs-item:hover { background: var(--surface-2); }
+.cs-item.active {
+  background: var(--surface-3);
+  border-color: var(--border-2);
+}
+
+.cs-title-text {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.cs-meta {
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+.cs-del {
+  position: absolute;
+  top: 4px; right: 4px;
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  padding: 2px 4px;
+}
+.cs-item:hover .cs-del { opacity: 1; }
+.cs-del:hover { color: var(--hot); }
+
+.cs-empty {
+  font-size: 11px;
+  color: var(--text-faint);
+  padding: 8px;
+  text-align: center;
+}
+
+.cs-search-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  color: var(--text-dim);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+}
+.cs-search-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+
+/* ===== SEARCH OVERLAY ===== */
+.search-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 200;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 60px;
+}
+
+.search-box {
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  width: 480px;
+  max-width: 90vw;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.search-input {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--border-2);
+  color: var(--text);
+  padding: 14px 16px;
+  font-size: 14px;
+  outline: none;
+  width: 100%;
+}
+.search-input::placeholder { color: var(--text-faint); }
+
+.search-results {
+  max-height: 360px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.search-result {
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+.search-result:hover { background: var(--surface-2); }
+
+.sr-role { font-size: 12px; flex-shrink: 0; opacity: 0.7; }
+.sr-content {
+  flex: 1;
+  color: var(--text);
+  word-break: break-word;
+  line-height: 1.4;
+}
+.sr-ts { font-size: 10px; color: var(--text-faint); flex-shrink: 0; white-space: nowrap; }
+.search-empty { padding: 20px; text-align: center; color: var(--text-faint); font-size: 12px; }
+.search-hint { padding: 8px 14px; font-size: 10px; color: var(--text-faint); text-align: center; border-top: 1px solid var(--border-2); }
+
 /* ===== CHAT ===== */
 .chat-area {
   display: flex;
   flex-direction: column;
-  height: 50vh;
-  margin-bottom: 24px;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  margin-bottom: 0;
 }
 
 .chat-area h2 {

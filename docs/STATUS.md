@@ -1,10 +1,27 @@
 # Status — Hermes Native
 
-Current: v0.9.0
+Current: v0.10.0
 
 ## What's Built ✅
 
-### v0.9.0 (current)
+### v0.10.0 (current)
+- [x] **Chat Sessions** — persistent session grouping in SQLite
+  - `sessions` table with id/title/created_at/updated_at/metadata
+  - `GET /api/sessions` list, `POST /api/sessions` create, `GET /api/sessions/{id}` get with messages, `PATCH /api/sessions/{id}` rename, `DELETE /api/sessions/{id}` delete with cascade
+  - `messages.session_id` links messages to sessions; auto-assigns on chat send
+  - ChatPanel sidebar: session list (+ new, × delete, click to switch)
+  - Auto-title from first user message
+  - Session-scoped message loading (isolated chat histories)
+- [x] **Full-Text Search** — SQLite FTS5 over messages
+  - `GET /api/search?q=hello` returns ranked results
+  - ChatPanel: Ctrl+F opens global search overlay with live results
+  - Graceful fallback to LIKE if FTS5 unavailable
+  - FTS5 index auto-populates on migration
+- [x] **DB auto-migration** — adds `sessions` table + `messages_fts` FTS5 index on boot
+  - `stats` endpoint includes `sessions` count
+- [x] **Version bumped** — v0.10.0 across frontend + backend
+
+### v0.9.0
 - [x] **Plugin system wired into daemon** — every lifecycle hook fires:
   - `pre_chat`, `post_chat`, `pre_task`, `post_task`, `on_pulse`, `on_mood_change`
 - [x] **Token tracking** — `messages.tokens` column with tiktoken (cl100k_base) + fallback
@@ -115,6 +132,10 @@ Current: v0.9.0
 | Chat clear | POST /api/chat/clear | messages purged |
 | Tokens | /api/tokens | total_tokens returns int |
 | Plugin hooks | logger plugin in plugins/ | plugins.log written |
+| Sessions | POST /api/sessions + GET /api/sessions | created + listed |
+| Session messages | GET /api/sessions/{id} | returns messages scoped |
+| Search | GET /api/search?q=hello | FTS5 ranked results |
+| Session sidebar | ChatPanel sidebar click | switches session isolated |
 
 ## Running
 
