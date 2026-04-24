@@ -412,6 +412,13 @@ export default function ChatPanel() {
     }
   }
 
+  const stopStreaming = () => {
+    wsRef.current?.close()
+    wsRef.current = null
+    streamingRef.current = false
+    setBusy(false)
+  }
+
   const fallbackHTTP = async (userMsg: Message, sid: string | null) => {
     try {
       const resp = await fetch('/api/chat', {
@@ -600,7 +607,11 @@ export default function ChatPanel() {
             onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
             disabled={busy}
           />
-          <button onClick={send} disabled={busy}>{busy ? '◐' : '🜹'}</button>
+          {busy ? (
+            <button onClick={stopStreaming} title="Stop">&times;</button>
+          ) : (
+            <button onClick={send} disabled={busy}>{'🜹'}</button>
+          )}
         </div>
       </div>
     </div>

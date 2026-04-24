@@ -96,7 +96,7 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.15.0</span>
+          <span className="ver">v0.16.0</span>
           <span className={`conn-dot ${connected ? 'conn-on' : 'conn-off'}`} title={connected ? 'Online' : 'Offline'}></span>
         </div>
         <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">
