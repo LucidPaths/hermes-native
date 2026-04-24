@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.3.2  
+**Version:** v0.5.0  
 **Repo:** `github.com/LucidPaths/hermes-native`  
 **Local:** `/home/lucid/workspace/hermes-native`
 ## Running Services
@@ -23,12 +23,21 @@ python3 backend/src/daemon.py
 
 ## What Works
 
-### v0.3.2 (current)
-- `start.sh` — one-command production launcher, auto-builds frontend, installs deps
-- Daemon defaults to `0.0.0.0:8789` — accessible from any device on LAN
-- Serves both `/api/*` routes and frontend static from one port
+### v0.5.0 (current)
+- **Task auto-archive** — done/error tasks removed from runtime `daemon.json`, persisted in SQLite
+- **Monotonic task IDs** — `task_counter` in state prevents ID collisions when tasks complete
+- **Task history in UI** — `TaskStream` loads DB history + merges with live SSE queue
+- **Live chat broadcast** — chat messages pushed to SSE for real-time timeline updates
+- Backend: `/api/tasks/history` endpoint
 
-### v0.3.1
+### v0.4.0
+- **Memory Layer** — SQLite persistence: `messages`, `tasks`, `pulses` tables
+- **Persistent chat history** — survives page reload via `/api/chat/history`
+- **Unified timeline** — `/api/timeline` interleaves messages + tasks + pulses chronologically
+- `MemoryTimeline.tsx` frontend component
+- Tabbed UI: Chat | Tasks | Timeline
+
+### v0.3.2
 - Vite proxy forwards both `/api` and `/events` to daemon
 - SSE live updates working in TaskStream
 - Task results display inline (Paris, Tokyo tested)
@@ -81,12 +90,17 @@ Browser (localhost:8788)
 
 ## What's Not Built (future sprints)
 
-- Persistent chat history (survives reload)
-- Streaming tokens in chat (vs full-response)
-- Ngrok/Tailscale tunnel for remote access from outside LAN
-- Systemd service for auto-start on boot
-- Desktop packaging (electron/tauri when rust available)
-- Phone hamburger menu for mobile nav
+- [x] Persistent chat history (survives reload) ✅ DONE v0.4.0
+- [x] Task history in UI (not just live queue) ✅ DONE v0.5.0
+- [ ] Streaming tokens in chat (vs full-response)
+- [ ] Ngrok/Tailscale tunnel for remote access from outside LAN
+- [ ] Systemd service for auto-start on boot
+- [ ] Desktop packaging (electron/tauri when rust available)
+- [ ] Phone hamburger menu for mobile nav
+- [ ] Markdown rendering in chat messages
+- [ ] Token count display in status panel
+- [ ] Model switching in UI
+- [ ] Export chat/session to markdown file
 
 ## Skill Created
 

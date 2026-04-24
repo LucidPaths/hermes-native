@@ -1,7 +1,8 @@
 """
 Hermes Native — Backend Daemon
-v0.4.0 — Memory Layer
+v0.5.0 — Task Auto-Cleanup + Live Chat Broadcasts
 SQLite persistence for chat, tasks, pulses. Unified timeline.
+Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 REST API + SSE on :8789
 """
 import asyncio
@@ -43,11 +44,12 @@ def load_state():
         except Exception:
             pass
     return {
-        "version": "0.4.0",
+        "version": "0.5.0",
         "booted": now(),
         "last_pulse": None,
         "next_pulse": None,
         "pulse_count": 0,
+        "task_counter": 0,
         "status": "idle",
         "current_task": None,
         "task_queue": [],
@@ -136,6 +138,7 @@ async def _run_hermes_task(task_id: str, desc: str):
                 save_state(state)
                 break
     await hub.push({"type": "state", "data": dict(state)})
+    await hub.push({"type": "task", "data": {"role": "task", "id": task_id, "desc": desc, "status": "running", "result": None, "ts": now()}})
     
     try:
         proc = await asyncio.create_subprocess_exec(
@@ -155,6 +158,8 @@ async def _run_hermes_task(task_id: str, desc: str):
                     t["result"] = response_text[:500]
                     break
             state["status"] = "idle" if not [t for t in state["task_queue"] if t["status"] in ("pending","running")] else "working"
+            # Auto-archive: remove done/error tasks from runtime state (persisted in DB)
+            state["task_queue"] = [t for t in state["task_queue"] if t["status"] in ("pending","running")]
             save_state(state)
         # Persist task completion
         if db:
@@ -170,6 +175,8 @@ async def _run_hermes_task(task_id: str, desc: str):
                     t["result"] = str(e)[:300]
                     break
             state["status"] = "idle" if not [t for t in state["task_queue"] if t["status"] in ("pending","running")] else "working"
+            # Auto-archive: remove done/error tasks from runtime state (persisted in DB)
+            state["task_queue"] = [t for t in state["task_queue"] if t["status"] in ("pending","running")]
             save_state(state)
         if db:
             try:
@@ -178,11 +185,21 @@ async def _run_hermes_task(task_id: str, desc: str):
                 print(f"[db] save_task error: {e2}")
     await hub.push({"type": "state", "data": dict(state)})
 
+async def task_history_get(request):
+    """Get persistent task history from SQLite."""
+    limit = int(request.query.get("limit", "100"))
+    try:
+        tasks = db.get_tasks(limit=limit) if db else []
+        return web.json_response(tasks)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 async def task_post(request):
     body = await request.json()
     async with state_lock:
+        state["task_counter"] = state.get("task_counter", 0) + 1
         task = {
-            "id": f"t{state['pulse_count']}x{len(state['task_queue'])}",
+            "id": f"t{state['pulse_count']}x{state['task_counter']}",
             "desc": body.get("description", ""),
             "status": "pending",
             "created": now(),
@@ -199,6 +216,15 @@ async def task_post(request):
     await hub.push({"type": "task", "data": task})
     asyncio.create_task(_run_hermes_task(task["id"], task["desc"]))
     return web.json_response(task)
+
+async def task_history_get(request):
+    """Get persistent task history from SQLite."""
+    limit = int(request.query.get("limit", "100"))
+    try:
+        tasks = db.get_tasks(limit=limit) if db else []
+        return web.json_response(tasks)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
 
 async def task_complete(request):
     body = await request.json()
@@ -285,6 +311,9 @@ async def chat_post(request):
                 })
             except Exception as e:
                 print(f"[db] save_message error: {e}")
+        # Broadcast to SSE listeners
+        await hub.push({"type": "chat", "data": {"role": "user", "content": msg, "t": now()}})
+        await hub.push({"type": "chat", "data": {"role": "assistant", "content": response_text, "t": now()}})
         
         return web.json_response({
             "response": response_text,
@@ -313,6 +342,70 @@ async def timeline_get(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+async def ws_chat(request):
+    """WebSocket chat with stream simulation."""
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
+    
+    async for msg in ws:
+        if msg.type == web.WSMsgType.TEXT:
+            body = json.loads(msg.data)
+            user_msg = body.get("message", "").strip()
+            if not user_msg:
+                await ws.send_str(json.dumps({"type": "error", "text": "empty"}))
+                continue
+            
+            # Persist user message
+            if db:
+                try: db.save_message("user", user_msg, metadata={"source": "native"})
+                except Exception as e: print(f"[db] ws user msg error: {e}")
+            
+            await hub.push({"type": "chat", "data": {"role": "user", "content": user_msg, "t": now()}})
+            await ws.send_str(json.dumps({"type": "start", "text": "⏤"}))
+            
+            # Stream: spawn hermes
+            try:
+                proc = await asyncio.create_subprocess_exec(
+                    "/home/lucid/.local/bin/hermes", "chat", "-q", user_msg, "-Q", "--yolo", "--accept-hooks", "--pass-session-id",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.PIPE,
+                    cwd=str(Path.home() / "workspace"),
+                    env={**dict(os.environ), "TERM": "dumb", "NO_COLOR": "1", "HERMES_ACCEPT_HOOKS": "1"},
+                )
+                
+                # Stream output line by line
+                chunks = []
+                while True:
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    chunk = line.decode().strip()
+                    if chunk:
+                        chunks.append(chunk)
+                        # Simulate typing: send every chunk
+                        await ws.send_str(json.dumps({"type": "chunk", "text": chunk}))
+                
+                _, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+                full_text = "\n".join(chunks).strip()
+                session_id = stderr.decode().strip().replace("session_id: ", "") if "session_id" in stderr.decode() else None
+                
+                # Persist full response
+                if db:
+                    try: db.save_message("assistant", full_text, metadata={"source": "native", "session_id": session_id})
+                    except Exception as e: print(f"[db] ws assistant msg error: {e}")
+                
+                await hub.push({"type": "chat", "data": {"role": "assistant", "content": full_text, "t": now()}})
+                await ws.send_str(json.dumps({"type": "done", "text": full_text}))
+                
+            except asyncio.TimeoutError:
+                await ws.send_str(json.dumps({"type": "error", "text": "timeout"}))
+            except Exception as e:
+                await ws.send_str(json.dumps({"type": "error", "text": str(e)}))
+        elif msg.type == web.WSMsgType.ERROR:
+            break
+    
+    return ws
+
 # ── Routes ──
 app = web.Application()
 app.router.add_get("/", health)
@@ -321,12 +414,14 @@ app.router.add_get("/api/state", state_get)
 app.router.add_patch("/api/state", state_patch)
 app.router.add_post("/api/pulse", pulse_post)
 app.router.add_post("/api/tasks", task_post)
+app.router.add_get("/api/tasks/history", task_history_get)
 app.router.add_post("/api/tasks/complete", task_complete)
 app.router.add_post("/api/chat", chat_post)
 app.router.add_get("/api/chat/history", chat_history_get)
 app.router.add_get("/api/timeline", timeline_get)
 app.router.add_get("/api/history", history_get)
 app.router.add_get("/events", events)
+app.router.add_get("/ws/chat", ws_chat)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware

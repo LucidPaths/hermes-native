@@ -150,7 +150,7 @@ def get_timeline(limit: int = 100):
         items.append({"type": "task", "t": r["completed"] or r["created"], "data": {"key": r["task_key"], "desc": r["description"], "status": r["status"], "result": r["result"]}})
     # pulses
     for r in conn.execute("SELECT pulse_num, status, created FROM pulses ORDER BY created DESC LIMIT ?", (limit,)):
-        items.append({"type": "pulse", "t": datetime.fromtimestamp(r["status"], tz=timezone.utc).isoformat(), "data": {"pulse": r["pulse_num"], "status": r["status"]}})
+        items.append({"type": "pulse", "t": datetime.fromtimestamp(r["created"], tz=timezone.utc).isoformat(), "data": {"pulse": r["pulse_num"], "status": r["status"]}})
     conn.close()
     items.sort(key=lambda x: x["t"], reverse=True)
     return items[:limit]

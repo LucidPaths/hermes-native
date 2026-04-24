@@ -5,6 +5,7 @@ interface Task {
   desc: string
   status: string
   created: string
+  completed?: string
   result?: string
   error?: string
 }
@@ -15,17 +16,40 @@ export default function TaskStream() {
   const [lastEvent, setLastEvent] = useState<string | null>(null)
   const wsRef = useRef<EventSource | null>(null)
 
+  // Load DB history on mount
+  useEffect(() => {
+    fetch('/api/tasks/history?limit=50')
+      .then(r => r.json())
+      .then((data: Task[]) => {
+        if (Array.isArray(data)) setTasks(data)
+      })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     const es = new EventSource('/events')
     es.onmessage = (e) => {
       const msg = JSON.parse(e.data)
       if (msg.type === 'state') {
         const q = msg.data.task_queue || []
-        setTasks(q)
+        setTasks(prev => {
+          // Merge: keep DB history + append live running/pending items
+          const liveIds = new Set(q.map((t: Task) => t.id))
+          const archived = prev.filter(t => !liveIds.has(t.id))
+          return [...archived, ...q]
+        })
         setLastEvent(new Date().toLocaleTimeString())
       }
       if (msg.type === 'task') {
-        setTasks(prev => [...prev, msg.data])
+        setTasks(prev => {
+          const existing = prev.findIndex(t => t.id === msg.data.id)
+          if (existing >= 0) {
+            const copy = [...prev]
+            copy[existing] = { ...copy[existing], ...msg.data }
+            return copy
+          }
+          return [...prev, msg.data]
+        })
       }
     }
     es.onerror = () => {}
@@ -43,14 +67,6 @@ export default function TaskStream() {
     setInput('')
   }
 
-  const complete = async (id: string) => {
-    await fetch('/api/tasks/complete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ task_id: id }),
-    })
-  }
-
   return (
     <div className="task-area">
       <h2>Task Stream {lastEvent && <span style={{fontSize:10, color:'var(--text-faint)', marginLeft:8}}>● {lastEvent}</span>}</h2>
@@ -64,9 +80,9 @@ export default function TaskStream() {
         <button onClick={sendTask}>Enqueue</button>
       </div>
       <div className="task-list">
-        {!tasks.length && (
+        {tasks.length === 0 && (
           <p style={{color:'var(--text-faint)', fontSize:13, padding:12}}>
-            No tasks queued. Hermes is idle.
+            No tasks yet. Hermes is idle.
           </p>
         )}
         {tasks.map(t => (
@@ -75,12 +91,6 @@ export default function TaskStream() {
             <span className="tdesc">{t.desc}</span>
             <span className={`tstatus ${t.status}`}>{t.status}</span>
             {t.result && <span className="tresult" title={t.result}>{t.result.slice(0,60)}</span>}
-            {t.status !== 'done' && t.status !== 'running' && (
-              <button
-                style={{background:'none',border:'none',color:'var(--text-faint)',cursor:'pointer',fontSize:11}}
-                onClick={() => complete(t.id)}
-              >done</button>
-            )}
           </div>
         ))}
       </div>
