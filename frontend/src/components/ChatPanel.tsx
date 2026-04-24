@@ -26,6 +26,7 @@ interface SearchResult {
   created: string
   session_id?: string
   tokens?: number
+  session_title?: string
 }
 
 interface Message {
@@ -77,7 +78,7 @@ setupMarked()
 
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes Native chat — v0.13.0', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — v0.14.0', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -435,6 +436,19 @@ export default function ChatPanel() {
     } catch { return '' }
   }
 
+  const exportSession = async () => {
+    if (!currentSession) return
+    try {
+      const resp = await fetch(`/api/export/chat?session_id=${encodeURIComponent(currentSession)}`)
+      const data = await resp.json()
+      if (data.ok) {
+        setMessages(prev => [...prev, { role: 'system', content: `Session exported to ${data.path}`, ts: new Date().toISOString() }])
+      }
+    } catch (e) {
+      console.error('export session', e)
+    }
+  }
+
   const clearChat = async () => {
     if (!window.confirm('Clear all chat history?')) return
     try {
@@ -471,7 +485,12 @@ export default function ChatPanel() {
               {searchResults.map(r => (
                 <div key={r.id} className="search-result" onClick={() => jumpToSearchResult(r)} title="Jump to session">
                   <span className="sr-role">{r.role === 'user' ? '◉' : '🜹'}</span>
-                  <span className="sr-content">{r.content.slice(0, 120)}</span>
+                  <span className="sr-content">
+                    {r.content.slice(0, 120)}
+                    {r.session_title && 
+                      <span className="sr-session">in “{r.session_title}”</span>
+                    }
+                  </span>
                   <span className="sr-ts">{new Date(r.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               ))}
@@ -511,6 +530,7 @@ export default function ChatPanel() {
           Chat
           {loaded && <span className="tag">streaming</span>}
           <button className="btn-ghost" onClick={clearChat} title="Clear chat (Ctrl+K)" style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px' }}>Clear</button>
+          {currentSession && <button className="btn-ghost" onClick={exportSession} title="Export this session" style={{ marginLeft: 4, fontSize: 10, padding: '2px 6px' }}>Export</button>}
         </h2>
         <div className="chat-history">
           {messages.map((m, i) => (

@@ -252,9 +252,13 @@ def get_timeline(limit: int = 100):
     return items[:limit]
 # ──────────────────────── Export / Stats ────────────────────────
 
-def export_chat_to_markdown(path: Path):
-    msgs = get_messages(limit=10000)
-    lines = ["# Hermes Native — Chat Export\n", f"Generated: {datetime.now(timezone.utc).isoformat()}\n\n"]
+def export_chat_to_markdown(path: Path, session_id: str = None):
+    if session_id:
+        msgs = get_messages_by_session(session_id, limit=10000)
+        lines = ["# Hermes Native — Session Export\n", f"**Session:** {session_id}\n", f"Generated: {datetime.now(timezone.utc).isoformat()}\n\n"]
+    else:
+        msgs = get_messages(limit=10000)
+        lines = ["# Hermes Native — Chat Export\n", f"Generated: {datetime.now(timezone.utc).isoformat()}\n\n"]
     for m in msgs:
         role = m["role"]
         content = m["content"]
@@ -352,9 +356,11 @@ def search_messages(query: str, limit: int = 50):
     # Try FTS5 first
     try:
         rows = conn.execute(
-            """SELECT m.id, m.role, m.content, m.created, m.session_id, m.tokens
+            """SELECT m.id, m.role, m.content, m.created, m.session_id, m.tokens,
+               COALESCE(s.title, '') as session_title
                FROM messages_fts fts
                JOIN messages m ON m.id = fts.rowid
+               LEFT JOIN sessions s ON s.id = m.session_id
                WHERE messages_fts MATCH ?
                ORDER BY rank
                LIMIT ?""",
@@ -363,7 +369,12 @@ def search_messages(query: str, limit: int = 50):
     except Exception:
         # Fallback to LIKE
         rows = conn.execute(
-            "SELECT id, role, content, created, session_id, tokens FROM messages WHERE content LIKE ? ORDER BY created DESC LIMIT ?",
+            """SELECT m.id, m.role, m.content, m.created, m.session_id, m.tokens,
+               COALESCE(s.title, '') as session_title
+               FROM messages m
+               LEFT JOIN sessions s ON s.id = m.session_id
+               WHERE m.content LIKE ?
+               ORDER BY m.created DESC LIMIT ?""",
             (f"%{query}%", limit)
         ).fetchall()
     conn.close()

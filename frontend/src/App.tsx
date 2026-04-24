@@ -39,12 +39,25 @@ export default function App() {
   const [dark, setDark] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  const [connected, setConnected] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => {
-      fetch('/api/state').then(r => r.json()).then(setState).catch(() => {})
+      fetch('/api/state')
+        .then(r => {
+          if (!r.ok) throw new Error('non-ok')
+          setConnected(true)
+          return r.json()
+        })
+        .then(setState)
+        .catch(() => {
+          setConnected(false)
+        })
     }, 5000)
-    fetch('/api/state').then(r => r.json()).then(setState).catch(() => {})
+    fetch('/api/state')
+      .then(r => { if (!r.ok) throw new Error('non-ok'); setConnected(true); return r.json() })
+      .then(setState)
+      .catch(() => setConnected(false))
     return () => clearInterval(interval)
   }, [])
 
@@ -79,7 +92,8 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.13.0</span>
+          <span className="ver">v0.14.0</span>
+          <span className={`conn-dot ${connected ? 'conn-on' : 'conn-off'}`} title={connected ? 'Online' : 'Offline'}></span>
         </div>
         <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">
           <span />

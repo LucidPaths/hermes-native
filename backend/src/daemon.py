@@ -1,6 +1,6 @@
 """
 Hermes Native — Backend Daemon
-v0.13.0 — Message regenerate, copy, session stats in sidebar
+v0.14.0 — Session-scoped export, search improvements, connection status
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
@@ -54,7 +54,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.13.0"  # always use current version
+            data["version"] = "0.14.0"  # always use current version
             return data
         except Exception:
             pass
@@ -374,11 +374,14 @@ async def stats_get(request):
         return web.json_response({"messages": 0, "tasks": 0, "pulses": 0, "error": str(e)}, status=500)
 
 async def export_chat(request):
-    """Export chat history to markdown file."""
+    """Export chat history to markdown file.\n    Query param `session_id` exports only one session; omit for all messages."""
     fmt = request.query.get("format", "markdown")
+    sid = request.query.get("session_id")
     try:
-        import db
-        path = db.export_chat_to_markdown(Path.home() / ".hermes-native" / "exports" / f"chat-export-{time.strftime('%Y%m%d-%H%M%S')}.md")
+        path = db.export_chat_to_markdown(
+            Path.home() / ".hermes-native" / "exports" / f"chat-export-{time.strftime('%Y%m%d-%H%M%S')}.md",
+            session_id=sid
+        )
         return web.json_response({"ok": True, "path": path})
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)

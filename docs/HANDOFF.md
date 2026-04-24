@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.12.0
+**Version:** v0.13.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -20,6 +20,13 @@ cd /home/lucid/workspace/hermes-native
 # Or directly:
 python3 backend/src/daemon.py
 ```
+
+### v0.13.0 (current)
+- **Message regenerate** — hover any assistant message → ↻ Regenerate button; POST `/api/regenerate` with `message_id` finds the preceding user message, re-runs hermes, replaces the assistant response in DB and updates the UI in place
+- **Message copy** — hover any non-system message → 📋 Copy button; copies raw content to clipboard via `navigator.clipboard`
+- **Session counts in sidebar** — `GET /api/sessions` now returns per-session `message_count` + `token_count` via correlated subqueries; ChatPanel sidebar shows "3 msgs · 124t" under each session title
+- **Session stats endpoint** — `GET /api/sessions/{id}/stats` returns `message_count`, `token_count`, `first_message`, `last_message`
+- Version bumped to v0.13.0; frontend rebuilt; daemon restarted
 
 ### v0.12.0 (current)
 - **Task retry** — failed tasks show ↻ Retry button in TaskStream; POST `/api/tasks/{id}/retry` re-queues the same task description, resets DB status to pending, broadcasts state, and fires `_run_hermes_task` async

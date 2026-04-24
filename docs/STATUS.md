@@ -1,10 +1,18 @@
 # Status — Hermes Native
 
-Current: v0.12.0
+Current: v0.13.0
 
 ## What's Built ✅
 
-### v0.12.0 (current)
+### v0.13.0 (current)
+- [x] **Message regenerate** — hover any assistant message to reveal ↻ Regenerate button; POST `/api/regenerate` with `message_id` finds preceding user message, re-runs hermes, and replaces the assistant response in DB + UI
+- [x] **Message copy** — hover any non-system message to reveal 📋 Copy button; copies full raw content to clipboard
+- [x] **Session counts in sidebar** — `GET /api/sessions` now returns `message_count` + `token_count` per session (subqueries); sidebar displays "3 msgs · 124t" under each session title
+- [x] **Session stats endpoint** — `GET /api/sessions/{id}/stats` returns `message_count`, `token_count`, `first_message`, `last_message`
+- [x] **Frontend rebuilt** — latest dist with all v0.13.0 features
+- [x] **Version bumped** — v0.13.0 across frontend + backend + docs
+
+### v0.12.0
 - [x] **Task retry** — failed tasks show ↻ Retry button; POST `/api/tasks/{id}/retry` re-queues same task description
 - [x] **Smart session titles** — POST `/api/sessions/{id}/smart-title` generates LLM-powered catchy title (2-5 words) from first messages; frontend auto-triggers after first exchange
 - [x] **Auto-refreshing stats** — SettingsPanel polls `/api/stats` every 15s so counts stay live without page reload
@@ -156,9 +164,13 @@ Current: v0.12.0
 || Search to Jump | Click search result → session switch | navigates |
 || Auto Session | Send chat with no session | auto-creates + titles |
 || Task Retry | POST /api/tasks/{id}/retry | re-queues failed task (404 for unknown) |
-|| Smart Title | POST /api/sessions/{id}/smart-title | LLM title generated (404 for unknown) |
-|| Auto Refresh | SettingsPanel open for 30s | stats update live |
-|| Help Overlay | Ctrl+/ | shortcuts modal appears |
+||| Smart Title | POST `/api/sessions/{id}/smart-title` | LLM title generated (404 for unknown) |
+||| Auto Refresh | SettingsPanel open for 30s | stats update live |
+||| Help Overlay | Ctrl+/ | shortcuts modal appears |
+||| Msg Copy | Hover assistant/user → 📋 | copies to clipboard |
+||| Msg Regenerate | Hover assistant → ↻ | re-runs + replaces response |
+||| Session Counts | `GET /api/sessions` | each has `message_count` + `token_count` |
+||| Session Stats | `GET /api/sessions/{id}/stats` | `message_count` + `token_count` + bounds |
 
 ## Running
 

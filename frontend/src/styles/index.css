@@ -76,6 +76,25 @@ html, body, #root {
   margin-left: 2px;
 }
 
+.ver {
+  font-size: 10px;
+  color: var(--text-faint);
+  border: 1px solid var(--border-2);
+  padding: 1px 6px;
+  border-radius: 99px;
+}
+
+/* connection status dot */
+.conn-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-left: 4px;
+}
+.conn-dot.conn-on { background: #22c55e; box-shadow: 0 0 4px #22c55e; }
+.conn-dot.conn-off { background: var(--hot); box-shadow: 0 0 4px var(--hot); }
+
+/* ===== DASHBOARD ===== */
 .topbar nav button {
   background: none;
   border: 1px solid var(--border-2);
@@ -456,6 +475,13 @@ html, body, #root {
   line-height: 1.4;
 }
 .sr-ts { font-size: 10px; color: var(--text-faint); flex-shrink: 0; white-space: nowrap; }
+.sr-session {
+  display: block;
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-top: 2px;
+  font-style: italic;
+}
 .search-empty { padding: 20px; text-align: center; color: var(--text-faint); font-size: 12px; }
 .search-hint { padding: 8px 14px; font-size: 10px; color: var(--text-faint); text-align: center; border-top: 1px solid var(--border-2); }
 
