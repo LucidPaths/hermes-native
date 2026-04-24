@@ -1,22 +1,52 @@
 import { useState, useRef, useEffect } from 'react'
 
+interface APIMessage {
+  id: number
+  role: string
+  content: string
+  created: string
+}
+
 interface Message {
   role: 'user' | 'assistant' | 'system'
   content: string
   ts: string
+  id?: number
 }
 
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes native chat', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — history persists', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    fetch('/api/chat/history?limit=50')
+      .then(r => r.json())
+      .then((data: APIMessage[]) => {
+        if (Array.isArray(data) && data.length > 0) {
+          const loaded: Message[] = data.map(m => ({
+            role: m.role as 'user'|'assistant'|'system',
+            content: m.content,
+            ts: m.created,
+            id: m.id,
+          }))
+          setMessages(prev => {
+            const boot = prev.filter(p => p.ts === 'boot')
+            return [...boot, ...loaded]
+          })
+        }
+        setLoaded(true)
+      })
+      .catch(() => setLoaded(true))
+  }, [])
+
+  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  }, [messages, busy])
 
   const send = async () => {
     if (!input.trim() || busy) return
@@ -49,14 +79,25 @@ export default function ChatPanel() {
     }
   }
 
+  const formatTime = (ts: string) => {
+    if (ts === 'boot') return ''
+    try {
+      const d = new Date(ts)
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    } catch { return '' }
+  }
+
   return (
     <div className="chat-area">
-      <h2>Chat</h2>
+      <h2>Chat {loaded && <span className="tag">persisted</span>}</h2>
       <div className="chat-history">
         {messages.map((m, i) => (
           <div key={i} className={`chat-msg chat-${m.role}`}>
             <span className="chat-role">{m.role === 'system' ? '◈' : m.role === 'user' ? '◉' : '🜹'}</span>
-            <span className="chat-body">{m.content}</span>
+            <div className="chat-bubble">
+              <span className="chat-body">{m.content}</span>
+              <span className="chat-ts">{formatTime(m.ts)}</span>
+            </div>
           </div>
         ))}
         {busy && (

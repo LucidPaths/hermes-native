@@ -3,6 +3,9 @@ import PulseOrb from './components/PulseOrb'
 import StatusPanel from './components/StatusPanel'
 import TaskStream from './components/TaskStream'
 import ChatPanel from './components/ChatPanel'
+import MemoryTimeline from './components/MemoryTimeline'
+
+type Tab = 'chat' | 'tasks' | 'timeline'
 
 interface PulseState {
   last_pulse: string | null
@@ -17,6 +20,7 @@ interface PulseState {
 
 export default function App() {
   const [state, setState] = useState<PulseState | null>(null)
+  const [tab, setTab] = useState<Tab>('chat')
   const [dark, setDark] = useState(true)
 
   useEffect(() => {
@@ -34,8 +38,12 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
+          <span className="ver">v0.4.0</span>
         </div>
-        <nav>
+        <nav className="tabs">
+          <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
+          <button className={tab === 'tasks' ? 'active' : ''} onClick={() => setTab('tasks')}>Tasks</button>
+          <button className={tab === 'timeline' ? 'active' : ''} onClick={() => setTab('timeline')}>Timeline</button>
           <button onClick={() => setDark(!dark)}>{dark ? '☀' : '◐'}</button>
         </nav>
       </header>
@@ -46,8 +54,9 @@ export default function App() {
           <StatusPanel state={state} />
         </section>
         <section className="right">
-          <ChatPanel />
-          <TaskStream />
+          {tab === 'chat' && <ChatPanel />}
+          {tab === 'tasks' && <TaskStream />}
+          {tab === 'timeline' && <MemoryTimeline />}
         </section>
       </main>
 
