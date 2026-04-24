@@ -46,7 +46,7 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.7.1</span>
+          <span className="ver">v0.7.2</span>
         </div>
         <nav className="tabs">
           <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>

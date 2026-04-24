@@ -1,10 +1,16 @@
 # Status — Hermes Native
 
-Current: v0.7.1
+Current: v0.7.2
 
 ## What's Built ✅
 
-### v0.7.1 (current)
+### v0.7.2 (current)
+- [x] **Markdown rendering in chat** — `marked` library, code blocks with syntax highlighting, links, bold, italic, lists
+- [x] **Mobile responsive timeline** — 65vh heights, compact styling
+- [x] **SettingsPanel fixes** — saved indicator, no page reload, persistent state
+- [x] **Systemd user service** — `hermes-native.service` with venv Python, auto-restart
+
+### v0.7.1 (stable)
 - [x] **Model Switching in UI** (SettingsPanel)
   - Model + provider selectors with curated options
   - PATCH /api/state with allowlist filtering
@@ -61,7 +67,7 @@ Current: v0.7.1
 
 | Feature | Test | Result |
 |---------|------|--------|
-| Chat (HTTP) | "say hello" | "ayy what's good :3" |
+| Chat (HTTP) | "say hello" | streaming active |
 | Chat (WS) | websocket via /ws/chat | streaming active |
 | Task async | "capital of France" | "Paris" |
 | Timeline | /api/timeline?limit=5 | 5 items interleaved |
@@ -69,8 +75,10 @@ Current: v0.7.1
 | Mood | /api/mood | label=idle, murmur=active |
 | Export | /api/export/chat | markdown file created |
 | Model switch | PATCH /api/state → model | persists and reflects |
+| Markdown | chat with code blocks | renders with code styles |
 | Static serving | GET / | index.html served |
 | Mobile DOM | chrome inspector 375px | renders stacked |
+| Systemd | systemctl --user status | running, auto-restart |
 
 ## Running
 
@@ -78,6 +86,11 @@ Current: v0.7.1
 cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 # open http://localhost:8789
+```
+
+Systemd service (auto-start on login):
+```bash
+bash scripts/setup-systemd.sh
 ```
 
 Defaults: `HERMES_NATIVE_HOST=0.0.0.0`, `PORT=8789`

@@ -1,7 +1,7 @@
 # Hermes Native — Status
 
-**Version:** v0.7.1  
-**Repo:** `github.com/LucidPaths/hermes-native`  
+**Version:** v0.7.2
+**Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
 ## Running Services
@@ -23,7 +23,12 @@ python3 backend/src/daemon.py
 
 ## What Works
 
-### v0.7.1 (current)
+### v0.7.2 (current)
+- **Markdown rendering in chat** — `marked` library, code blocks, links, bold, italic, lists
+- **Mobile responsive timeline** — 65vh heights, compact styling
+- **Systemd user service** — `hermes-native.service` with venv Python, auto-restart on crash
+
+### v0.7.1
 - **Model Switching in UI** — SettingsPanel with model/provider selectors
 - **Markdown Export** — `/api/export/chat` creates `~/.hermes-native/exports/*.md`
 - **Mood in StatusPanel** — label, color, murmur displayed
@@ -114,10 +119,11 @@ Browser (localhost:8789)
 - [ ] Systemd service for auto-start on boot
 - [ ] Desktop packaging (electron/tauri when rust available)
 - [ ] Phone hamburger menu for mobile nav
-- [ ] Markdown rendering in chat messages
+- [ ] Markdown rendering in chat messages ✅ DONE v0.7.2
 - [ ] Token count display in status panel
 - [ ] Export chat/session to markdown file ✅ DONE v0.7.1
 - [ ] Model switching in UI ✅ DONE v0.7.1
+- [ ] Systemd service for auto-start on boot ✅ DONE v0.7.2
 
 ## Skill Created
 

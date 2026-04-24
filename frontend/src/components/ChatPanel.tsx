@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { marked } from 'marked'
 
 interface APIMessage {
   id: number
@@ -169,7 +170,7 @@ export default function ChatPanel() {
           <div key={i} className={`chat-msg chat-${m.role}`}>
             <span className="chat-role">{m.role === 'system' ? '◈' : m.role === 'user' ? '◉' : '🜹'}</span>
             <div className="chat-bubble">
-              <span className={`chat-body ${m.streaming ? 'streaming' : ''}`}>{m.content}</span>
+              <span className={`chat-body ${m.streaming ? 'streaming' : ''}`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
               <span className="chat-ts">{formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}</span>
             </div>
           </div>
