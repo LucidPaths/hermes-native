@@ -123,10 +123,6 @@ async def pulse():
     await hub.push({"type": "pulse", "data": state})
     return state
 
-async def state_get(request):
-    async with state_lock:
-        return web.json_response(dict(state))
-
 async def state_patch(request):
     body = await request.json()
     async with state_lock:
@@ -285,6 +281,13 @@ async def events(request):
         hub.remove(q)
     return resp
 
+async def index(request):
+    """Serve the frontend SPA."""
+    index_path = FE_DIST / "index.html"
+    if index_path.exists():
+        return web.FileResponse(index_path)
+    return web.json_response({"ok": True, "version": state["version"], "status": state["status"]})
+
 async def health(_):
     m = _get_cached_mood()
     return web.json_response({"ok": True, "version": state["version"], "status": state["status"], "mood": m["label"], "murmur": m["murmur"]})
@@ -435,7 +438,9 @@ async def ws_chat(request):
 
 # ── Routes ──
 app = web.Application()
-app.router.add_get("/", health)
+async def index(request):
+    return web.json_response({"ok": True, "version": state["version"], "status": state["status"], "mood": _get_cached_mood().get("label","idle")})
+app.router.add_get("/", index)
 app.router.add_get("/health", health)
 app.router.add_get("/api/state", state_get)
 app.router.add_patch("/api/state", state_patch)
