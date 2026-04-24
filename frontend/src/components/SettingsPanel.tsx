@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 const MODELS = [
   'auto',
@@ -34,6 +34,22 @@ export default function SettingsPanel({
   const [exporting, setExporting] = useState(false)
   const [exportPath, setExportPath] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [version, setVersion] = useState<string>('v0.7.2')
+  const [stats, setStats] = useState<any>(null)
+
+  // Load version and stats
+  useEffect(() => {
+    fetch('/api/state')
+      .then(r => r.json())
+      .then((data: any) => {
+        if (data.version) setVersion(`v${data.version}`)
+      })
+      .catch(() => {})
+    fetch('/api/stats')
+      .then(r => r.json())
+      .then(setStats)
+      .catch(() => {})
+  }, [])
 
   const save = async () => {
     setSaving(true)
@@ -103,13 +119,29 @@ export default function SettingsPanel({
       <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '20px 0' }} />
 
       <h3 style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-faint)', marginBottom: 12 }}>Stats</h3>
+      {stats && (
+        <>
+          <div className="kv-row">
+            <span className="kv-key">messages</span>
+            <span className="kv-val">{stats.messages}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-key">tasks</span>
+            <span className="kv-val">{stats.tasks}</span>
+          </div>
+          <div className="kv-row">
+            <span className="kv-key">pulses</span>
+            <span className="kv-val">{stats.pulses}</span>
+          </div>
+        </>
+      )}
       <div className="kv-row">
         <span className="kv-key">db</span>
         <span className="kv-val" style={{ fontSize: 11 }}>~/.hermes-native/state/memory.db</span>
       </div>
       <div className="kv-row">
         <span className="kv-key">version</span>
-        <span className="kv-val" id="settings-version">v0.6.2</span>
+        <span className="kv-val">{version}</span>
       </div>
     </div>
   )

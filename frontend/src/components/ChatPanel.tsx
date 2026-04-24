@@ -90,7 +90,7 @@ export default function ChatPanel() {
           setMessages(prev => {
             const updated = [...prev]
             if (streamingIndex >= 0 && updated[streamingIndex]) {
-              updated[streamingIndex] = { ...updated[streamingIndex], content: updated[streamingIndex].content + (msg.text ? msg.text + ' ' : '') }
+              updated[streamingIndex] = { ...updated[streamingIndex], content: updated[streamingIndex].content + (msg.text ? '\n' + msg.text : '') }
             }
             return updated
           })
@@ -162,9 +162,40 @@ export default function ChatPanel() {
     } catch { return '' }
   }
 
+  const clearChat = async () => {
+    if (!window.confirm('Clear all chat history?')) return
+    try {
+      await fetch('/api/chat/clear', { method: 'POST' })
+      setMessages([{ role: 'system', content: 'Chat cleared.', ts: new Date().toISOString() }])
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        wsRef.current?.close()
+        setBusy(false)
+        streamingRef.current = false
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        clearChat()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
+
   return (
     <div className="chat-area">
-      <h2>Chat {loaded && <span className="tag">streaming</span>}</h2>
+      <h2>
+        Chat
+        {loaded && <span className="tag">streaming</span>}
+        <button className="btn-ghost" onClick={clearChat} title="Clear chat (Ctrl+K)" style={{ marginLeft: 8, fontSize: 10, padding: '2px 6px' }}>Clear</button>
+      </h2>
       <div className="chat-history">
         {messages.map((m, i) => (
           <div key={i} className={`chat-msg chat-${m.role}`}>

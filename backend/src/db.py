@@ -176,6 +176,20 @@ def get_db_stats():
     conn.close()
     return {"messages": msgs, "tasks": tasks, "pulses": pulses, "db_path": str(DB_PATH)}
 
+# ── Clear ────────────────────────
+
+def clear_messages():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("DELETE FROM messages")
+    conn.commit()
+    conn.close()
+
+def clear_tasks():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("DELETE FROM tasks")
+    conn.commit()
+    conn.close()
+
 if __name__ == "__main__":
     init_db()
     print("db init", DB_PATH)

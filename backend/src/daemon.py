@@ -46,11 +46,13 @@ def now():
 def load_state():
     if STATE_FILE.exists():
         try:
-            return json.loads(STATE_FILE.read_text())
+            data = json.loads(STATE_FILE.read_text())
+            data["version"] = "0.7.3"  # always use current version
+            return data
         except Exception:
             pass
     return {
-        "version": "0.7.2",
+        "version": "0.7.3",
         "booted": now(),
         "last_pulse": None,
         "next_pulse": None,
@@ -302,7 +304,16 @@ async def state_get(request):
     async with state_lock:
         s = dict(state)
         s["mood"] = _get_cached_mood()
+        s["tasks_queued"] = len(state.get("task_queue", []))
         return web.json_response(s)
+
+async def stats_get(request):
+    """Get DB stats — message, task, pulse counts."""
+    try:
+        s = db.get_db_stats() if db else {"messages": 0, "tasks": 0, "pulses": 0, "db_path": "unknown"}
+        return web.json_response(s)
+    except Exception as e:
+        return web.json_response({"messages": 0, "tasks": 0, "pulses": 0, "error": str(e)}, status=500)
 
 async def export_chat(request):
     """Export chat history to markdown file."""
@@ -311,6 +322,17 @@ async def export_chat(request):
         import db
         path = db.export_chat_to_markdown(Path.home() / ".hermes-native" / "exports" / f"chat-export-{time.strftime('%Y%m%d-%H%M%S')}.md")
         return web.json_response({"ok": True, "path": path})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def clear_chat(request):
+    """Clear all chat messages from the database."""
+    try:
+        if db:
+            db.clear_messages()
+            return web.json_response({"ok": True})
+        else:
+            return web.json_response({"ok": False, "error": "db not available"}, status=500)
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
@@ -467,6 +489,8 @@ app.router.add_get("/api/history", history_get)
 app.router.add_get("/events", events)
 app.router.add_get("/ws/chat", ws_chat)
 app.router.add_get("/api/export/chat", export_chat)
+app.router.add_post("/api/chat/clear", clear_chat)
+app.router.add_get("/api/stats", stats_get)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware

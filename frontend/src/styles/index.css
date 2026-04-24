@@ -816,6 +816,19 @@ html, body, #root {
 }
 .btn-primary:hover { background: var(--accent); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-ghost {
+  background: none;
+  border: 1px solid var(--border-2);
+  color: var(--text-faint);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-ghost:hover {
+  border-color: var(--accent-dim);
+  color: var(--text);
+}
 .btn-secondary {
   background: var(--surface-3);
   border: 1px solid var(--border-2);

@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.7.2
+**Version:** v0.7.3
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -23,7 +23,14 @@ python3 backend/src/daemon.py
 
 ## What Works
 
-### v0.7.2 (current)
+### v0.7.3 (current)
+- **DB Stats endpoint** — `/api/stats` returns message/task/pulse counts from SQLite
+- **Chat clear** — "Clear" button + Ctrl+K shortcut calls `POST /api/chat/clear`, purges DB messages
+- **Chat streaming fix** — chunks joined with `\n` instead of spaces, line-by-line readable
+- **SettingsPanel live stats** — dynamic version from `/api/state`, live counts from `/api/stats`
+- **Version pinning** — daemon.json version overwritten on load so UI never lies
+
+### v0.7.2
 - **Markdown rendering in chat** — `marked` library, code blocks, links, bold, italic, lists
 - **Mobile responsive timeline** — 65vh heights, compact styling
 - **Systemd user service** — `hermes-native.service` with venv Python, auto-restart on crash

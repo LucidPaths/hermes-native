@@ -1,10 +1,17 @@
 # Status — Hermes Native
 
-Current: v0.7.2
+Current: v0.7.3
 
 ## What's Built ✅
 
-### v0.7.2 (current)
+### v0.7.3 (current)
+- [x] **DB Stats endpoint** — `/api/stats` returns message/task/pulse counts from SQLite
+- [x] **Chat clear** — "Clear" button (+ Ctrl+K shortcut) calls `/api/chat/clear`, purges DB messages
+- [x] **Chat streaming fix** — chunks joined with `\n` instead of spaces, line-by-line readable
+- [x] **SettingsPanel live stats** — dynamic version from `/api/state`, live counts from `/api/stats`
+- [x] **Version pinning** — daemon.json version overwritten on load so UI never lies
+
+### v0.7.2 (stable)
 - [x] **Markdown rendering in chat** — `marked` library, code blocks with syntax highlighting, links, bold, italic, lists
 - [x] **Mobile responsive timeline** — 65vh heights, compact styling
 - [x] **SettingsPanel fixes** — saved indicator, no page reload, persistent state
@@ -79,6 +86,8 @@ Current: v0.7.2
 | Static serving | GET / | index.html served |
 | Mobile DOM | chrome inspector 375px | renders stacked |
 | Systemd | systemctl --user status | running, auto-restart |
+| DB stats | /api/stats | live counts |
+| Chat clear | POST /api/chat/clear | messages purged |
 
 ## Running
 
