@@ -438,8 +438,6 @@ async def ws_chat(request):
 
 # ── Routes ──
 app = web.Application()
-async def index(request):
-    return web.json_response({"ok": True, "version": state["version"], "status": state["status"], "mood": _get_cached_mood().get("label","idle")})
 app.router.add_get("/", index)
 app.router.add_get("/health", health)
 app.router.add_get("/api/state", state_get)

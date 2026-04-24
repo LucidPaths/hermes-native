@@ -1,58 +1,71 @@
 # Status — Hermes Native
 
-Current: v0.5.0
+Current: v0.7.0
 
 ## What's Built ✅
 
-- [x] GitHub repo: `LucidPaths/hermes-native` — 10+ commits
-- [x] Backend daemon (`backend/src/daemon.py`): aiohttp on :8789
-  - State keeper (JSON file persistence)
-  - REST API: `/health`, `/api/state`, `/api/pulse`, `/api/tasks`, `/api/tasks/complete`, `/api/tasks/history`, `/api/chat`, `/api/chat/history`, `/api/timeline`, `/api/history`
-  - SSE `/events` (live state push)
-  - CORS middleware for dev
-  - **Async task invoker** — spawns `hermes chat -q` via asyncio subprocess, tracks `pending → running → done`
-  - **Hermes agent bridge** — chat endpoint that invokes CLI, returns clean text
-  - **SQLite memory layer** — `db.py`: messages, tasks, pulses tables with unified timeline query
-  - **Task auto-archive** — done/error tasks removed from runtime state, persisted in DB
-  - **Monotonic task IDs** — `task_counter` prevents ID collisions
-  - **Live chat broadcast** — chat messages pushed to SSE listeners for real-time timeline updates
-- [x] Frontend (Vite + React + TypeScript):
-  - `App.tsx` — tabbed navigation (Chat / Tasks / Timeline), dark/light toggle
-  - `PulseOrb.tsx` — animated CSS orb with `idle/working/error` color states
-  - `StatusPanel.tsx` — live state display (model, pulses, queue depth, last pulse)
-  - `TaskStream.tsx` — enqueue tasks, load DB history + merge with live SSE, see full past results
-  - `ChatPanel.tsx` — full chat with persistent history (`/api/chat/history`), timestamps, persisted badge
-  - `MemoryTimeline.tsx` — unified chronological feed of messages, tasks, pulses from `/api/timeline`
-  - Dark void theme (CSS variables, radial gradient, monospace + sans-serif)
-  - Mobile responsive via `@media (max-width: 768px)`
-- [x] Build system:
-  - `npm run build` → zero errors
-  - Static serving from daemon (single port)
-  - `./scripts/start.sh` — production launcher with auto-build
-- [x] Heartbeat cron: `hermes-native-heartbeat` every 15m (job ID: `b7e594c34aaf`)
-- [x] Session interrupt recovery skill
+### v0.7.0 (current)
+- [x] **Mood Engine** (backend/src/mood.py)
+  - Dawn / Idle / Working / Dusk / Night / Error mood states
+  - Time-of-day adaptation, idle detection
+  - Murmurs: random philosophical fragments per mood
+  - Mood cache refreshed every 60s
+  - API: GET /api/mood — returns full mood object
+  - Orb color shifts based on mood (accent colors per state)
+  - Status panel shows mood label + murmur
+
+### v0.6.2 (stable)
+- [x] **Frontend SPA serving** — root `/` serves index.html, `/health` remains API
+
+### v0.6.0
+- [x] **WebSocket streaming chat** — GET /ws/chat
+  - Line-by-line streaming from hermes subprocess
+  - Frontend: typing animation with streaming cursor
+  - HTTP fallback if websocket unavailable
+- [x] **Plugin System** (backend/src/plugins.py)
+  - Hook registry: pre_chat, post_chat, pre_task, post_task, on_pulse, on_mood_change
+  - Auto-discovery from ~/.hermes-native/plugins/*.py
+- [x] **Mood Engine v1**
+
+### v0.5.0
+- [x] **Enhanced Timeline** — date grouping, type filters (all/chat/tasks/pulses)
+- [x] **Live SSE timeline** — MemoryTimeline subscribes to /events, appends new items
+- [x] **Task auto-archive** — done/error tasks removed from runtime state, persisted in DB
+- [x] **Monotonic task IDs** — task_counter increments, IDs like t1x2 never repeat
+
+### v0.4.0
+- [x] **SQLite persistence** — messages, tasks, pulses tables
+- [x] **REST endpoints** — /api/chat/history, /api/timeline
+- [x] **Tabbed UI** — Chat / Tasks / Timeline
+- [x] **Chat history load** — ChatPanel fetches persistent messages on mount
+
+### Legacy (v0.1.0–v0.3.4)
+- [x] Aiohttp daemon with state keeper
+- [x] REST API + SSE + WebSocket
+- [x] React + Vite + TypeScript frontend
+- [x] PulseOrb, StatusPanel, TaskStream, ChatPanel
+- [x] Dark void aesthetic + mobile responsive
+- [x] Hermes agent bridge via subprocess
 
 ## End-to-End Verified ✅
 
 | Feature | Test | Result |
 |---------|------|--------|
-| Chat | "what is 5*7" | "35" |
-| Chat persistence | reload page | history restored from SQLite |
+| Chat (HTTP) | "say hello" | "ayy what's good :3" |
+| Chat (WS) | websocket via /ws/chat | streaming active |
 | Task async | "capital of France" | "Paris" |
-| Task history | load TaskStream tab | past tasks visible with results |
-| Task auto-archive | check state after done | runtime clean, DB has record |
-| Monotonic IDs | post 2 tasks rapidly | unique IDs verified |
-| Timeline | `/api/timeline` | messages+tasks+pulses interleaved |
-| SSE updates | task status transitions | live |
+| Timeline | /api/timeline?limit=5 | 5 items interleaved |
+| History | /api/chat/history?limit=5 | 5 messages persisted |
+| Mood | /api/mood | label=idle, murmur=active |
+| Static serving | GET / | index.html served |
 | Mobile DOM | chrome inspector 375px | renders stacked |
-| Phone LAN | `172.21.170.236:8788` | accessible |
 
 ## Running
 
 ```bash
 cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
-# open http://localhost:8789 (or http://YOUR_IP:8789 on phone)
+# open http://localhost:8789
 ```
 
 Defaults: `HERMES_NATIVE_HOST=0.0.0.0`, `PORT=8789`
@@ -71,4 +84,4 @@ See `docs/HANDOFF.md` for full architecture, test log, and future sprints.
 | P2 Agnostic | ✅ Any model hermes supports |
 | P3 Simplicity | ✅ Pillaged webui patterns + hermes CLI |
 | P4 Observable | ✅ Every pulse logged + SSE + task results |
-| P9 Compounding | ✅ Task queue + task results + chat history accumulate |
+| P9 Compounding | ✅ Task queue + task results accumulate |
