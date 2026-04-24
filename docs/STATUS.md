@@ -1,12 +1,21 @@
 # Status — Hermes Native
 
-Current: v0.15.0
+Current: v0.16.0
 
 ## What's Built
 
-### v0.15.0 (current)
-- [x] **Inline session rename** -- double-click any session title in sidebar to edit; Enter saves, Escape cancels, blur auto-saves; inline styled input with accent border
-- [x] **Dark-mode auto-detect** -- reads `prefers-color-scheme: dark` on first load via `window.matchMedia`; no flash of wrong theme
+### v0.16.0 (current)
+- [x] **Stop streaming button** -- while assistant is streaming, send button becomes &times; Stop; clicking closes WebSocket, sets streaming=false, busy=false immediately
+- [x] **Frontend rebuilt** -- latest dist with all v0.16.0 features
+- [x] **Version bumped** -- v0.16.0 across frontend + backend + docs
+
+### v0.15.1
+- [x] **Session persistence** -- selected session stored in `localStorage`; survives page reload
+- [x] **Frontend rebuilt** -- latest dist with all v0.15.1 features
+
+### v0.15.0
+- [x] **Inline session rename** -- double-click any session title in sidebar to edit; Enter saves, Escape cancels, blur auto-saves
+- [x] **Dark-mode auto-detect** -- reads `prefers-color-scheme: dark` on first load via `window.matchMedia`
 - [x] **Message actions** -- assistant messages get Copy + Regenerate; user messages get Copy + Delete; all hover-revealed
 - [x] **Frontend rebuilt** -- latest dist with all v0.15.0 features
 - [x] **Version bumped** -- v0.15.0 across frontend + backend + docs
@@ -189,6 +198,7 @@ Current: v0.15.0
 ||| Search Titles | Results show session name | FTS5 + LEFT JOIN |
 ||| Inline Rename | Double-click session title | editable inline |
 ||| Connection Dot | Green/red dot in topbar | reflects `/api/state` health |
+||| Stop Streaming | Click &times; while streaming | closes WS, halts output |
 
 ## Running
 

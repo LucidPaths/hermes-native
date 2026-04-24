@@ -21,21 +21,41 @@ cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 ```
 
-### v0.13.0 (current)
-- **Message regenerate** — hover any assistant message → ↻ Regenerate button; POST `/api/regenerate` with `message_id` finds the preceding user message, re-runs hermes, replaces the assistant response in DB and updates the UI in place
-- **Message copy** — hover any non-system message → 📋 Copy button; copies raw content to clipboard via `navigator.clipboard`
-- **Session counts in sidebar** — `GET /api/sessions` now returns per-session `message_count` + `token_count` via correlated subqueries; ChatPanel sidebar shows "3 msgs · 124t" under each session title
-- **Session stats endpoint** — `GET /api/sessions/{id}/stats` returns `message_count`, `token_count`, `first_message`, `last_message`
+### v0.16.0 (current)
+- **Stop streaming button** -- while assistant is streaming, the send button becomes an `&times;` Stop button; clicking closes the WebSocket, sets `streaming=false`, and frees the input immediately
+- Version bumped to v0.16.0; frontend rebuilt; daemon restarted
+
+### v0.15.1
+- **Session persistence** -- selected session id stored in `localStorage`; survives page reload and page refreshes
+- Version bumped to v0.15.1; frontend rebuilt; daemon restarted
+
+### v0.15.0
+- **Inline session rename** -- double-click any session title in sidebar to edit; Enter saves, Escape cancels, blur auto-saves; inline styled input with accent border
+- **Dark-mode auto-detect** -- reads `prefers-color-scheme: dark` on first load via `window.matchMedia`; no flash of wrong theme
+- **Message actions** -- assistant messages get 📋 Copy + ↻ Regenerate; user messages get 📋 Copy + × Delete; all hover-revealed
+- Version bumped to v0.15.0; frontend rebuilt; daemon restarted
+
+### v0.14.0
+- **Session-scoped export** -- `GET /api/export/chat?session_id={id}` exports only the selected session; ChatPanel header shows "Export" button per-session
+- **Search with session titles** -- search results include `session_title` via LEFT JOIN; show session name below each result
+- **Connection status dot** -- green/red dot in topbar reflects `/api/state` health polling every 5s
+- Version bumped to v0.14.0; frontend rebuilt; daemon restarted
+
+### v0.13.0
+- **Message regenerate** -- hover any assistant message → ↻ Regenerate button; POST `/api/regenerate` with `message_id` finds the preceding user message, re-runs hermes, replaces the assistant response in DB and updates the UI in place
+- **Message copy** -- hover any non-system message → 📋 Copy button; copies raw content to clipboard via `navigator.clipboard`
+- **Session counts in sidebar** -- `GET /api/sessions` now returns per-session `message_count` + `token_count` via correlated subqueries; ChatPanel sidebar shows "3 msgs · 124t" under each session title
+- **Session stats endpoint** -- `GET /api/sessions/{id}/stats` returns `message_count`, `token_count`, `first_message`, `last_message`
 - Version bumped to v0.13.0; frontend rebuilt; daemon restarted
 
-### v0.12.0 (current)
-- **Task retry** — failed tasks show ↻ Retry button in TaskStream; POST `/api/tasks/{id}/retry` re-queues the same task description, resets DB status to pending, broadcasts state, and fires `_run_hermes_task` async
-- **Smart session titles** — POST `/api/sessions/{id}/smart-title` sends first 6 messages to hermes LLM with "generate an extremely short, catchy title (2-5 words, max 40 chars)"; frontend auto-triggers after first user→assistant exchange completes (only when title is still auto-generated)
-- **Auto-refreshing stats** — SettingsPanel mounts a `setInterval` (15s) that polls `/api/stats`; teardown on unmount
-- **Keyboard shortcuts help overlay** — Ctrl+/ toggles centered modal with all shortcuts; Tab cycles panels (chat→tasks→timeline→settings); Escape closes overlays/modals; CSS: glassmorphic help-box with key-value table
+### v0.12.0
+- **Task retry** -- failed tasks show ↻ Retry button in TaskStream; POST `/api/tasks/{id}/retry` re-queues the same task description, resets DB status to pending, broadcasts state, and fires `_run_hermes_task` async
+- **Smart session titles** -- POST `/api/sessions/{id}/smart-title` sends first 6 messages to hermes LLM with "generate an extremely short, catchy title (2-5 words, max 40 chars)"; frontend auto-triggers after first user→assistant exchange completes (only when title is still auto-generated)
+- **Auto-refreshing stats** -- SettingsPanel mounts a `setInterval` (15s) that polls `/api/stats`; teardown on unmount
+- **Keyboard shortcuts help overlay** -- Ctrl+/ toggles centered modal with all shortcuts; Tab cycles panels (chat→tasks→timeline→settings); Escape closes overlays/modals; CSS: glassmorphic help-box with key-value table
 
 ### v0.11.0
-- **UX Polish** — search-to-jump, auto-sessions, copy code, token badges, message deletion
+- **UX Polish** -- search-to-jump, auto-sessions, copy code, token badges, message deletion
   - Clickable search results: click result → jump directly to its session
   - Auto-create session: if no session selected when sending chat, new session auto-created + titled from first message
   - Code block copy buttons: every rendered code block gets a "Copy" header with language tag
