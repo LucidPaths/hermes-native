@@ -7,6 +7,11 @@ interface State {
   tasks_queued: number
   model: string
   provider: string
+  mood?: {
+    label: string
+    murmur: string
+    color?: string
+  }
 }
 
 export default function StatusPanel({ state }: { state: State | null }) {
@@ -33,6 +38,17 @@ export default function StatusPanel({ state }: { state: State | null }) {
           <span className="kv-val">{v}</span>
         </div>
       ))}
+      {state.mood && (
+        <div className="mood-block" style={{marginTop:12, paddingTop:12, borderTop:'1px solid var(--border)'}}>
+          <div className="kv-row">
+            <span className="kv-key">mood</span>
+            <span className="kv-val" style={{color: state.mood.color || 'var(--accent)'}}>{state.mood.label}</span>
+          </div>
+          <p style={{fontSize:11, color:'var(--text-dim)', marginTop:4, fontStyle:'italic', lineHeight:1.4}}>
+            {state.mood.murmur}
+          </p>
+        </div>
+      )}
     </div>
   )
 }

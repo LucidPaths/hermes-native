@@ -1,10 +1,20 @@
 # Status — Hermes Native
 
-Current: v0.7.0
+Current: v0.7.1
 
 ## What's Built ✅
 
-### v0.7.0 (current)
+### v0.7.1 (current)
+- [x] **Model Switching in UI** (SettingsPanel)
+  - Model + provider selectors with curated options
+  - PATCH /api/state with allowlist filtering
+  - Settings tab added next to Chat/Tasks/Timeline
+- [x] **Markdown Export** — `/api/export/chat` exports chat history to `~/.hermes-native/exports/*.md`
+- [x] **Mood in StatusPanel** — displays mood label, color, and murmur
+- [x] **Mood-colored PulseOrb** — orb color shifts to match mood state
+- [x] **State PATCH filtering** — only allowed keys (model, provider, status, etc.) can be modified
+
+### v0.7.0 (stable)
 - [x] **Mood Engine** (backend/src/mood.py)
   - Dawn / Idle / Working / Dusk / Night / Error mood states
   - Time-of-day adaptation, idle detection
@@ -57,6 +67,8 @@ Current: v0.7.0
 | Timeline | /api/timeline?limit=5 | 5 items interleaved |
 | History | /api/chat/history?limit=5 | 5 messages persisted |
 | Mood | /api/mood | label=idle, murmur=active |
+| Export | /api/export/chat | markdown file created |
+| Model switch | PATCH /api/state → model | persists and reflects |
 | Static serving | GET / | index.html served |
 | Mobile DOM | chrome inspector 375px | renders stacked |
 

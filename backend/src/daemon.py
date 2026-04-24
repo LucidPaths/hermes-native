@@ -50,7 +50,7 @@ def load_state():
         except Exception:
             pass
     return {
-        "version": "0.6.0",
+        "version": "0.7.1",
         "booted": now(),
         "last_pulse": None,
         "next_pulse": None,
@@ -125,8 +125,11 @@ async def pulse():
 
 async def state_patch(request):
     body = await request.json()
+    # Allow model/provider switching via PATCH
+    allowed_keys = {"model", "provider", "status", "current_task", "version","mood_label","mood_murmur"}
+    filtered = {k: v for k, v in body.items() if k in allowed_keys}
     async with state_lock:
-        state.update(body)
+        state.update(filtered)
         save_state(state)
     await hub.push({"type": "state", "data": dict(state)})
     return web.json_response(dict(state))
@@ -301,6 +304,16 @@ async def state_get(request):
         s["mood"] = _get_cached_mood()
         return web.json_response(s)
 
+async def export_chat(request):
+    """Export chat history to markdown file."""
+    fmt = request.query.get("format", "markdown")
+    try:
+        import db
+        path = db.export_chat_to_markdown(Path.home() / ".hermes-native" / "exports" / f"chat-export-{time.strftime('%Y%m%d-%H%M%S')}.md")
+        return web.json_response({"ok": True, "path": path})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 def _get_cached_mood():
     global _current_mood, _last_mood_at
     import time
@@ -453,6 +466,7 @@ app.router.add_get("/api/timeline", timeline_get)
 app.router.add_get("/api/history", history_get)
 app.router.add_get("/events", events)
 app.router.add_get("/ws/chat", ws_chat)
+app.router.add_get("/api/export/chat", export_chat)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware
