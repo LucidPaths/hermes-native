@@ -6,6 +6,15 @@ import ChatPanel from './components/ChatPanel'
 import MemoryTimeline from './components/MemoryTimeline'
 import SettingsPanel from './components/SettingsPanel'
 
+const SHORTCUTS: { key: string; desc: string }[] = [
+  { key: 'Ctrl+/', desc: 'Show shortcuts' },
+  { key: 'Ctrl+N', desc: 'New session' },
+  { key: 'Ctrl+F', desc: 'Search' },
+  { key: 'Ctrl+K', desc: 'Clear chat' },
+  { key: 'Esc', desc: 'Cancel / Close' },
+  { key: 'Tab', desc: 'Switch panel' },
+]
+
 type Tab = 'chat' | 'tasks' | 'timeline' | 'settings'
 
 interface PulseState {
@@ -29,6 +38,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('chat')
   const [dark, setDark] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [helpOpen, setHelpOpen] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -37,6 +47,23 @@ export default function App() {
     fetch('/api/state').then(r => r.json()).then(setState).catch(() => {})
     return () => clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+        e.preventDefault()
+        setHelpOpen(o => !o)
+      }
+      if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        const tabs: Tab[] = ['chat', 'tasks', 'timeline', 'settings']
+        const idx = tabs.indexOf(tab)
+        setTab(tabs[(idx + 1) % tabs.length])
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [tab])
 
   const moodColor = state?.mood?.color
 
@@ -52,7 +79,7 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.11.0</span>
+          <span className="ver">v0.12.0</span>
         </div>
         <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">
           <span />
@@ -79,6 +106,25 @@ export default function App() {
             <button onClick={() => { setDark(!dark); setMenuOpen(false); }}>{dark ? '☀ Light' : '◐ Dark'}</button>
           </nav>
         </>
+      )}
+
+      {helpOpen && (
+        <div className="help-overlay" onClick={() => setHelpOpen(false)}>
+          <div className="help-box" onClick={e => e.stopPropagation()}>
+            <h3>Keyboard Shortcuts</h3>
+            <table className="help-table">
+              <tbody>
+                {SHORTCUTS.map(s => (
+                  <tr key={s.key}>
+                    <td className="help-key">{s.key}</td>
+                    <td className="help-desc">{s.desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="help-hint">Click outside or press Ctrl+/ to close</div>
+          </div>
+        </div>
       )}
 
       <main className="dashboard">

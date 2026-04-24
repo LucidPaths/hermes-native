@@ -54,6 +54,14 @@ export default function SettingsPanel({
       .then(r => r.json())
       .then(setTunnel)
       .catch(() => {})
+    // Auto-refresh stats every 15s
+    const iv = setInterval(() => {
+      fetch('/api/stats')
+        .then(r => r.json())
+        .then(setStats)
+        .catch(() => {})
+    }, 15000)
+    return () => clearInterval(iv)
   }, [])
 
   const save = async () => {

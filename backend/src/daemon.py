@@ -1,6 +1,6 @@
 """
 Hermes Native — Backend Daemon
-v0.11.0 — UX Polish: jump-to-search, auto-sessions, copy code, message deletion
+v0.12.0 — Task retry, smart titles, auto-refresh stats, keyboard shortcuts
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
@@ -53,7 +53,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.11.0"  # always use current version
+            data["version"] = "0.12.0"  # always use current version
             return data
         except Exception:
             pass
@@ -651,6 +651,65 @@ async def search_get(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+# ── Task Retry ──
+
+async def task_retry(request):
+    """Retry a failed task by re-running it with the same description."""
+    tid = request.match_info.get("id")
+    try:
+        t = db.get_task_by_key(tid) if db else None
+        if not t:
+            return web.json_response({"error": "not found"}, status=404)
+        desc = t.get("description", "")
+        # Reset DB status
+        if db:
+            db.save_task(tid, desc, "pending")
+        # Re-add to runtime queue
+        async with state_lock:
+            state["task_counter"] = state.get("task_counter", 0) + 1
+            task = {
+                "id": tid,
+                "desc": desc,
+                "status": "pending",
+                "created": now(),
+            }
+            state["task_queue"].append(task)
+            state["status"] = "working"
+            save_state(state)
+        await hub.push({"type": "task", "data": task})
+        await hub.push({"type": "state", "data": dict(state)})
+        asyncio.create_task(_run_hermes_task(tid, desc))
+        return web.json_response({"ok": True, "task": task})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+# ── Smart Session Title ──
+
+async def session_smart_title(request):
+    """Generate a smart title from session messages using hermes LLM."""
+    sid = request.match_info.get("id")
+    try:
+        session = db.get_session(sid) if db else None
+        if not session:
+            return web.json_response({"error": "not found"}, status=404)
+        msgs = db.get_messages_by_session(sid, limit=6) if db else []
+        transcript = "\n".join([f"{'User' if m['role']=='user' else 'Assistant'}: {m['content'][:200]}" for m in msgs])
+        if not transcript.strip():
+            return web.json_response({"ok": True, "title": session.get("title", "Session"), "source": "fallback"})
+        prompt = f"Given this chat transcript, generate an extremely short, catchy title (2-5 words, max 40 chars). Respond ONLY with the title text, no quotes.\n\n{transcript[:1200]}"
+        proc = await asyncio.create_subprocess_exec(
+            "/home/lucid/.local/bin/hermes", "chat", "-q", prompt, "-Q", "--yolo", "--source", "native-smart-title",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            env={**dict(os.environ), "TERM": "dumb", "NO_COLOR": "1"},
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=60)
+        title = stdout.decode().strip().split("\n")[-1][:60].strip('"\'`')
+        if db:
+            db.update_session(sid, title=title)
+        return web.json_response({"ok": True, "title": title, "source": "llm"})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 # ── Routes ──
 app = web.Application()
 app.router.add_get("/", index)
@@ -661,6 +720,7 @@ app.router.add_post("/api/pulse", pulse_post)
 app.router.add_post("/api/tasks", task_post)
 app.router.add_get("/api/tasks/history", task_history_get)
 app.router.add_post("/api/tasks/complete", task_complete)
+app.router.add_post("/api/tasks/{id}/retry", task_retry)
 app.router.add_get("/api/mood", mood_get)
 app.router.add_post("/api/chat", chat_post)
 app.router.add_get("/api/chat/history", chat_history_get)
@@ -680,6 +740,7 @@ app.router.add_post("/api/sessions", session_post)
 app.router.add_get("/api/sessions/{id}", session_get)
 app.router.add_delete("/api/sessions/{id}", session_delete)
 app.router.add_patch("/api/sessions/{id}", session_rename)
+app.router.add_post("/api/sessions/{id}/smart-title", session_smart_title)
 app.router.add_get("/api/search", search_get)
 
 # DELETE single message
@@ -704,7 +765,7 @@ async def cors_middleware(request, handler):
     if request.method == "OPTIONS":
         resp = web.Response()
         resp.headers["Access-Control-Allow-Origin"] = "*"
-        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, OPTIONS"
+        resp.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
         resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
         return resp
     resp = await handler(request)

@@ -201,6 +201,13 @@ def get_tasks(limit: int = 100):
     conn.close()
     return [dict(r) for r in rows]
 
+def get_task_by_key(task_key: str):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    row = conn.execute("SELECT * FROM tasks WHERE task_key = ?", (task_key,)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 # ──────────────────────── Pulses ────────────────────────
 
 def save_pulse(pulse_num: int, status: str, data: dict):

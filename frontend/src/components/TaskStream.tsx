@@ -74,6 +74,10 @@ export default function TaskStream() {
     setInput('')
   }
 
+  const retryTask = async (id: string) => {
+    await fetch(`/api/tasks/${id}/retry`, { method: 'POST' })
+  }
+
   return (
     <div className="task-area">
       <h2>Task Stream {lastEvent && <span style={{fontSize:10, color:'var(--text-faint)', marginLeft:8}}>● {lastEvent}</span>}</h2>
@@ -98,6 +102,9 @@ export default function TaskStream() {
             <span className="tdesc">{t.desc}</span>
             <span className={`tstatus ${t.status}`}>{t.status}</span>
             {t.result && <span className="tresult" title={t.result}>{t.result.slice(0,60)}</span>}
+            {t.status === 'error' && (
+              <button className="tretry" onClick={() => retryTask(t.id)}>↻ Retry</button>
+            )}
           </div>
         ))}
       </div>

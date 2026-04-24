@@ -1,10 +1,18 @@
 # Status — Hermes Native
 
-Current: v0.11.0
+Current: v0.12.0
 
 ## What's Built ✅
 
-### v0.11.0 (current)
+### v0.12.0 (current)
+- [x] **Task retry** — failed tasks show ↻ Retry button; POST `/api/tasks/{id}/retry` re-queues same task description
+- [x] **Smart session titles** — POST `/api/sessions/{id}/smart-title` generates LLM-powered catchy title (2-5 words) from first messages; frontend auto-triggers after first exchange
+- [x] **Auto-refreshing stats** — SettingsPanel polls `/api/stats` every 15s so counts stay live without page reload
+- [x] **Keyboard shortcuts help overlay** — Ctrl+/ opens floating shortcuts reference; Tab cycles panels (chat→tasks→timeline→settings); Escape closes; overlays styled with glassmorphism
+- [x] **CORS updated** — DELETE method added to Access-Control-Allow-Methods for message deletion
+- [x] **Version bumped** — v0.12.0 across frontend + backend + docs
+
+### v0.11.0
 - [x] **Clickable search results** — search overlay results are now clickable; click a result to jump directly to its session
 - [x] **Auto-create session on first chat** — if no session is selected when sending a message, a new session is automatically created using the first message text as title
 - [x] **Code block copy buttons** — all code blocks rendered via `marked` now get a "Copy" button header
@@ -145,8 +153,12 @@ Current: v0.11.0
 | Session Msgs | GET /api/sessions/{id} | messages scoped |
 | Search | GET /api/search?q=hello | FTS5 ranked results |
 | Msg Delete | DELETE /api/messages/1 | {"ok": true} |
-| Search to Jump | Click search result → session switch | navigates |
-| Auto Session | Send chat with no session | auto-creates + titles |
+|| Search to Jump | Click search result → session switch | navigates |
+|| Auto Session | Send chat with no session | auto-creates + titles |
+|| Task Retry | POST /api/tasks/{id}/retry | re-queues failed task (404 for unknown) |
+|| Smart Title | POST /api/sessions/{id}/smart-title | LLM title generated (404 for unknown) |
+|| Auto Refresh | SettingsPanel open for 30s | stats update live |
+|| Help Overlay | Ctrl+/ | shortcuts modal appears |
 
 ## Running
 

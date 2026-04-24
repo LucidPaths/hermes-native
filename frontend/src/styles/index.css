@@ -1092,6 +1092,76 @@ html, body, #root {
 }
 .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .tretry {
+    background: none;
+    border: 1px solid var(--hot);
+    color: var(--hot);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+  }
+  .tretry:hover {
+    background: var(--hot);
+    color: var(--void);
+  }
+
+  .help-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.15s ease;
+  }
+  .help-box {
+    background: var(--surface-2);
+    border: 1px solid var(--border-2);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    min-width: 260px;
+    max-width: 90vw;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  }
+  .help-box h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--text);
+    font-family: var(--font-mono);
+  }
+  .help-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .help-key {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--accent);
+    padding: 6px 0;
+    white-space: nowrap;
+    width: 80px;
+  }
+  .help-desc {
+    font-size: 13px;
+    color: var(--text-dim);
+    padding-left: 12px;
+  }
+  .help-hint {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 12px;
+    text-align: center;
+    font-family: var(--font-mono);
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
 /* ===== MOBILE TABS ===== */
 @media (max-width: 768px) {
   .tabs { display: none; }

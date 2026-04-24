@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.11.0
+**Version:** v0.12.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -21,7 +21,13 @@ cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 ```
 
-### v0.11.0 (current)
+### v0.12.0 (current)
+- **Task retry** — failed tasks show ↻ Retry button in TaskStream; POST `/api/tasks/{id}/retry` re-queues the same task description, resets DB status to pending, broadcasts state, and fires `_run_hermes_task` async
+- **Smart session titles** — POST `/api/sessions/{id}/smart-title` sends first 6 messages to hermes LLM with "generate an extremely short, catchy title (2-5 words, max 40 chars)"; frontend auto-triggers after first user→assistant exchange completes (only when title is still auto-generated)
+- **Auto-refreshing stats** — SettingsPanel mounts a `setInterval` (15s) that polls `/api/stats`; teardown on unmount
+- **Keyboard shortcuts help overlay** — Ctrl+/ toggles centered modal with all shortcuts; Tab cycles panels (chat→tasks→timeline→settings); Escape closes overlays/modals; CSS: glassmorphic help-box with key-value table
+
+### v0.11.0
 - **UX Polish** — search-to-jump, auto-sessions, copy code, token badges, message deletion
   - Clickable search results: click result → jump directly to its session
   - Auto-create session: if no session selected when sending chat, new session auto-created + titled from first message

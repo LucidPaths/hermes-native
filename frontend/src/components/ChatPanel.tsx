@@ -216,6 +216,20 @@ export default function ChatPanel() {
     }
   }
 
+  const triggerSmartTitle = (sid: string) => {
+    // Only trigger if session title is still auto-generated
+    const s = sessions.find(s => s.id === sid)
+    if (!s || (s.title !== 'Untitled' && s.title !== 'New Session' && s.title !== '')) return
+    fetch(`/api/sessions/${sid}/smart-title`, { method: 'POST' })
+      .then(r => r.json())
+      .then((data: any) => {
+        if (data.ok && data.title) {
+          setSessions(prev => prev.map(s => s.id === sid ? { ...s, title: data.title } : s))
+        }
+      })
+      .catch(() => {})
+  }
+
   const deleteMessage = async (msgId: number | undefined) => {
     if (!msgId) return
     if (!window.confirm('Delete this message?')) return
@@ -330,6 +344,11 @@ export default function ChatPanel() {
           ws.close()
           setBusy(false)
           streamingRef.current = false
+          // trigger smart title generation after first meaningful exchange
+          const userMsgs = messages.filter(m => m.role === 'user').length
+          if (activeSession && userMsgs <= 1) {
+            triggerSmartTitle(activeSession)
+          }
         } else if (msg.type === 'error') {
           setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${msg.text}`, ts: new Date().toISOString() }])
           ws.close()
