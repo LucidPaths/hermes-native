@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.13.0
+**Version:** v0.15.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 

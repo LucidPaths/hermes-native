@@ -1,10 +1,24 @@
 # Status — Hermes Native
 
-Current: v0.13.0
+Current: v0.15.0
 
-## What's Built ✅
+## What's Built
 
-### v0.13.0 (current)
+### v0.15.0 (current)
+- [x] **Inline session rename** -- double-click any session title in sidebar to edit; Enter saves, Escape cancels, blur auto-saves; inline styled input with accent border
+- [x] **Dark-mode auto-detect** -- reads `prefers-color-scheme: dark` on first load via `window.matchMedia`; no flash of wrong theme
+- [x] **Message actions** -- assistant messages get Copy + Regenerate; user messages get Copy + Delete; all hover-revealed
+- [x] **Frontend rebuilt** -- latest dist with all v0.15.0 features
+- [x] **Version bumped** -- v0.15.0 across frontend + backend + docs
+
+### v0.14.0
+- [x] **Session-scoped export** -- `GET /api/export/chat?session_id={id}` exports only the selected session; ChatPanel header shows "Export" button per-session
+- [x] **Search with session titles** -- search results include `session_title` via LEFT JOIN; show session name below each result
+- [x] **Connection status dot** -- green/red dot in topbar reflects `/api/state` health polling every 5s
+- [x] **Frontend rebuilt** -- latest dist with all v0.14.0 features
+- [x] **Version bumped** -- v0.14.0 across frontend + backend + docs
+
+### v0.13.0
 - [x] **Message regenerate** — hover any assistant message to reveal ↻ Regenerate button; POST `/api/regenerate` with `message_id` finds preceding user message, re-runs hermes, and replaces the assistant response in DB + UI
 - [x] **Message copy** — hover any non-system message to reveal 📋 Copy button; copies full raw content to clipboard
 - [x] **Session counts in sidebar** — `GET /api/sessions` now returns `message_count` + `token_count` per session (subqueries); sidebar displays "3 msgs · 124t" under each session title
@@ -171,6 +185,10 @@ Current: v0.13.0
 ||| Msg Regenerate | Hover assistant → ↻ | re-runs + replaces response |
 ||| Session Counts | `GET /api/sessions` | each has `message_count` + `token_count` |
 ||| Session Stats | `GET /api/sessions/{id}/stats` | `message_count` + `token_count` + bounds |
+||| Session Export | `GET /api/export/chat?session_id=x` | exports single session |
+||| Search Titles | Results show session name | FTS5 + LEFT JOIN |
+||| Inline Rename | Double-click session title | editable inline |
+||| Connection Dot | Green/red dot in topbar | reflects `/api/state` health |
 
 ## Running
 

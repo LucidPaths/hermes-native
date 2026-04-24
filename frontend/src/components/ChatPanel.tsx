@@ -89,8 +89,16 @@ export default function ChatPanel() {
 
   // Sessions
   const [sessions, setSessions] = useState<Session[]>([])
-  const [currentSession, setCurrentSession] = useState<string | null>(null)
+  const [currentSession, setCurrentSession] = useState<string | null>(() => {
+    try { return localStorage.getItem('selectedSession'); } catch { return null; }
+  })
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
+
+  useEffect(() => {
+    if (currentSession) {
+      try { localStorage.setItem('selectedSession', currentSession); } catch {}
+    }
+  }, [currentSession])
 
   // Search
   const [searchOpen, setSearchOpen] = useState(false)
