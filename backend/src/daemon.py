@@ -1,6 +1,6 @@
 """
 Hermes Native — Backend Daemon
-v0.9.0 — Plugin System + Token Tracking
+v0.10.0 — Chat Sessions + Full-Text Search
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
