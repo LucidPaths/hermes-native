@@ -15,6 +15,8 @@ interface Session {
   title: string
   created_at: string
   updated_at: string
+  message_count?: number
+  token_count?: number
 }
 
 interface SearchResult {
@@ -75,7 +77,7 @@ setupMarked()
 
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes Native chat — v0.11.0', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — v0.13.0', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -238,6 +240,33 @@ export default function ChatPanel() {
       setMessages(prev => prev.filter(m => m.id !== msgId))
     } catch (e) {
       console.error('delete msg', e)
+    }
+  }
+
+  const copyMessage = async (content: string | undefined) => {
+    if (!content) return
+    try {
+      await navigator.clipboard.writeText(content)
+    } catch (e) {
+      console.error('copy msg', e)
+    }
+  }
+
+  const regenerateMessage = async (msgId: number | undefined) => {
+    if (!msgId) return
+    if (!window.confirm('Regenerate this response?')) return
+    try {
+      const resp = await fetch('/api/regenerate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message_id: msgId }),
+      })
+      const data = await resp.json()
+      if (data.ok && data.response) {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: data.response } : m))
+      }
+    } catch (e) {
+      console.error('regenerate msg', e)
     }
   }
 
@@ -465,7 +494,10 @@ export default function ChatPanel() {
               onClick={() => setCurrentSession(s.id)}
             >
               <div className="cs-title-text">{s.title}</div>
-              <div className="cs-meta">{new Date(s.updated_at).toLocaleDateString()}</div>
+              <div className="cs-meta">
+                <span>{new Date(s.updated_at).toLocaleDateString()}</span>
+                <span className="cs-counts">{s.message_count ?? 0} msgs · {(s.token_count ?? 0).toLocaleString()}t</span>
+              </div>
               <button className="cs-del" onClick={e => { e.stopPropagation(); deleteSession(s.id); }} title="Delete">×</button>
             </div>
           ))}
@@ -490,7 +522,11 @@ export default function ChatPanel() {
                   {formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}
                   {m.tokens !== undefined && m.tokens > 0 && <span className="token-badge">{m.tokens}t</span>}
                   {m.id && m.role !== 'system' && (
-                    <button className="msg-del" onClick={() => deleteMessage(m.id)} title="Delete message">×</button>
+                    <>
+                      <button className="msg-act" onClick={() => copyMessage(m.content)} title="Copy message">📋</button>
+                      {m.role === 'assistant' && <button className="msg-act" onClick={() => regenerateMessage(m.id)} title="Regenerate">↻</button>}
+                      <button className="msg-act msg-del" onClick={() => deleteMessage(m.id)} title="Delete message">×</button>
+                    </>
                   )}
                 </span>
               </div>

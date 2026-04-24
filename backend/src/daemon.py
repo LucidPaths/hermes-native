@@ -1,12 +1,13 @@
 """
 Hermes Native — Backend Daemon
-v0.12.0 — Task retry, smart titles, auto-refresh stats, keyboard shortcuts
+v0.13.0 — Message regenerate, copy, session stats in sidebar
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
 Plugin hooks: pre_chat, post_chat, pre_task, post_task, on_pulse, on_mood_change.
 REST API + SSE + WS on :8789
 """
+import sqlite3
 import asyncio
 import json
 import os
@@ -53,7 +54,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.12.0"  # always use current version
+            data["version"] = "0.13.0"  # always use current version
             return data
         except Exception:
             pass
@@ -551,14 +552,6 @@ async def ws_chat(request):
     
     return ws
 
-async def stats_get(request):
-    """Get DB stats — message, task, pulse counts."""
-    try:
-        s = db.get_db_stats() if db else {"messages": 0, "tasks": 0, "pulses": 0, "db_path": "unknown"}
-        return web.json_response(s)
-    except Exception as e:
-        return web.json_response({"messages": 0, "tasks": 0, "pulses": 0, "error": str(e)}, status=500)
-
 async def tunnel_status(request):
     """Return active tunnel URL if any."""
     import os
@@ -638,6 +631,82 @@ async def session_rename(request):
         return web.json_response({"error": str(e)}, status=500)
 
 # ── Search ──
+
+async def session_stats_get(request):
+    """Get stats for a session: message count, token count, first/last message."""
+    try:
+        sid = request.match_info["id"]
+        conn = sqlite3.connect(str(db.DB_PATH))
+        conn.row_factory = sqlite3.Row
+        # Count + tokens
+        row = conn.execute(
+            "SELECT COUNT(*) as message_count, COALESCE(SUM(tokens), 0) as token_count FROM messages WHERE session_id = ?",
+            (sid,)
+        ).fetchone()
+        # First / last message timestamps
+        bounds = conn.execute(
+            "SELECT MIN(created) as first_msg, MAX(created) as last_msg FROM messages WHERE session_id = ?",
+            (sid,)
+        ).fetchone()
+        conn.close()
+        return web.json_response({
+            "ok": True,
+            "session_id": sid,
+            "message_count": row["message_count"],
+            "token_count": row["token_count"],
+            "first_message": bounds["first_msg"],
+            "last_message": bounds["last_msg"],
+        })
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def regenerate_post(request):
+    """Regenerate assistant response for a given message id.
+    Finds the preceding user message in the same session, re-runs hermes, and replaces the assistant message.
+    """
+    try:
+        body = await request.json()
+        msg_id = body.get("message_id")
+        if not msg_id:
+            return web.json_response({"error": "message_id required"}, status=400)
+        conn = sqlite3.connect(str(db.DB_PATH))
+        conn.row_factory = sqlite3.Row
+        # Find the assistant message to get session_id
+        msg = conn.execute("SELECT * FROM messages WHERE id = ? AND role = 'assistant'", (int(msg_id),)).fetchone()
+        if not msg:
+            conn.close()
+            return web.json_response({"error": "assistant message not found"}, status=404)
+        session_id = msg["session_id"]
+        created = msg["created"]
+        # Find the preceding user message in the same session, before this assistant message
+        user_msg_row = conn.execute(
+            "SELECT * FROM messages WHERE session_id = ? AND role = 'user' AND created < ? ORDER BY created DESC LIMIT 1",
+            (session_id, created)
+        ).fetchone()
+        conn.close()
+        if not user_msg_row:
+            return web.json_response({"error": "no preceding user message found"}, status=400)
+        user_msg_text = user_msg_row["content"]
+        # Run hermes chat sync
+        result = subprocess.run(
+            ["/home/lucid/.local/bin/hermes", "chat", "-q", user_msg_text, "-Q", "--yolo", "--accept-hooks", "--pass-session-id"],
+            capture_output=True, text=True, timeout=120,
+            cwd=str(Path.home() / "workspace"),
+            env={**dict(os.environ), "TERM": "dumb", "NO_COLOR": "1", "HERMES_ACCEPT_HOOKS": "1"},
+        )
+        response_text = (result.stdout or "(no output)").strip().split("\n")[-1]
+        # Replace the assistant message in DB
+        new_conn = sqlite3.connect(str(db.DB_PATH))
+        tokens = db._count_tokens(response_text)
+        new_conn.execute(
+            "UPDATE messages SET content = ?, tokens = ?, created = ? WHERE id = ?",
+            (response_text, tokens, db.now_iso(), int(msg_id))
+        )
+        new_conn.commit()
+        new_conn.close()
+        return web.json_response({"ok": True, "response": response_text})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
 
 async def search_get(request):
     """Full-text search over messages."""
@@ -741,7 +810,9 @@ app.router.add_get("/api/sessions/{id}", session_get)
 app.router.add_delete("/api/sessions/{id}", session_delete)
 app.router.add_patch("/api/sessions/{id}", session_rename)
 app.router.add_post("/api/sessions/{id}/smart-title", session_smart_title)
+app.router.add_get("/api/sessions/{id}/stats", session_stats_get)
 app.router.add_get("/api/search", search_get)
+app.router.add_post("/api/regenerate", regenerate_post)
 
 # DELETE single message
 async def message_delete(request):

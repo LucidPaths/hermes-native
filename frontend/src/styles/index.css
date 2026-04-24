@@ -621,6 +621,34 @@ html, body, #root {
 .msg-del:hover {
   color: var(--hot);
 }
+/* message action buttons */
+.msg-act {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 11px;
+  cursor: pointer;
+  margin-left: 4px;
+  opacity: 0;
+  padding: 0 3px;
+}
+.chat-msg:hover .msg-act {
+  opacity: 1;
+}
+.msg-act:hover {
+  color: var(--accent);
+}
+.msg-act.msg-del:hover {
+  color: var(--hot);
+}
+
+/* session sidebar counts */
+.cs-counts {
+  margin-left: auto;
+  opacity: 0.7;
+  font-variant-numeric: tabular-nums;
+}
+
 .chat-body strong {
   color: var(--text);
   font-weight: 600;

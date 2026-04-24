@@ -290,7 +290,11 @@ def get_sessions(limit: int = 100):
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
-        "SELECT * FROM sessions ORDER BY updated_at DESC LIMIT ?", (limit,)
+        """SELECT s.*,
+            (SELECT COUNT(*) FROM messages WHERE session_id = s.id) as message_count,
+            (SELECT COALESCE(SUM(tokens), 0) FROM messages WHERE session_id = s.id) as token_count
+         FROM sessions s
+         ORDER BY updated_at DESC LIMIT ?""", (limit,)
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
