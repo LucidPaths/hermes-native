@@ -1,10 +1,19 @@
 # Status — Hermes Native
 
-Current: v0.10.0
+Current: v0.11.0
 
 ## What's Built ✅
 
-### v0.10.0 (current)
+### v0.11.0 (current)
+- [x] **Clickable search results** — search overlay results are now clickable; click a result to jump directly to its session
+- [x] **Auto-create session on first chat** — if no session is selected when sending a message, a new session is automatically created using the first message text as title
+- [x] **Code block copy buttons** — all code blocks rendered via `marked` now get a "Copy" button header
+- [x] **Per-message token badge** — each message shows its token count (e.g. "124t") next to timestamp
+- [x] **Message deletion** — hover any message to reveal × delete button; DELETE `/api/messages/{id}` removes from DB
+- [x] **Version bumped** — v0.11.0 across frontend + backend + docs
+- [x] **Frontend rebuilt** — latest dist with all v0.11.0 features
+
+### v0.10.0
 - [x] **Chat Sessions** — persistent session grouping in SQLite
   - `sessions` table with id/title/created_at/updated_at/metadata
   - `GET /api/sessions` list, `POST /api/sessions` create, `GET /api/sessions/{id}` get with messages, `PATCH /api/sessions/{id}` rename, `DELETE /api/sessions/{id}` delete with cascade
@@ -128,14 +137,16 @@ Current: v0.10.0
 | Static serving | GET / | index.html served |
 | Mobile DOM | chrome inspector 375px | renders stacked |
 | Systemd | systemctl --user status | running, auto-restart |
-| DB stats | /api/stats | live counts |
-| Chat clear | POST /api/chat/clear | messages purged |
+| DB Stats | /api/stats | live counts |
+| Chat Clear | POST /api/chat/clear | messages purged |
 | Tokens | /api/tokens | total_tokens returns int |
-| Plugin hooks | logger plugin in plugins/ | plugins.log written |
+| Plugin Hooks | logger plugin in plugins/ | plugins.log written |
 | Sessions | POST /api/sessions + GET /api/sessions | created + listed |
-| Session messages | GET /api/sessions/{id} | returns messages scoped |
+| Session Msgs | GET /api/sessions/{id} | messages scoped |
 | Search | GET /api/search?q=hello | FTS5 ranked results |
-| Session sidebar | ChatPanel sidebar click | switches session isolated |
+| Msg Delete | DELETE /api/messages/1 | {"ok": true} |
+| Search to Jump | Click search result → session switch | navigates |
+| Auto Session | Send chat with no session | auto-creates + titles |
 
 ## Running
 

@@ -6,6 +6,8 @@ interface APIMessage {
   role: string
   content: string
   created: string
+  session_id?: string
+  tokens?: number
 }
 
 interface Session {
@@ -21,6 +23,7 @@ interface SearchResult {
   content: string
   created: string
   session_id?: string
+  tokens?: number
 }
 
 interface Message {
@@ -28,6 +31,7 @@ interface Message {
   content: string
   ts: string
   id?: number
+  tokens?: number
   streaming?: boolean
 }
 
@@ -36,9 +40,42 @@ interface WSMessage {
   text: string
 }
 
+function parseMarkdown(content: string): string {
+  try {
+    return (marked as any).parseSync(content || '') as string
+  } catch {
+    try {
+      return marked.parse(content || '') as string
+    } catch {
+      return content || ''
+    }
+  }
+}
+
+function markedCopyable(code: string, infostring?: string) {
+  const lang = infostring || 'text'
+  const safeCode = code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return `<div class="code-block-wrap"><div class="code-header"><span class="code-lang">${lang}</span><button class="code-copy" onclick="(function(btn){const code=btn.closest('.code-block-wrap').querySelector('code').textContent;navigator.clipboard.writeText(code);btn.textContent='Copied!';setTimeout(function(){btn.textContent='Copy'},1500)})(this)">Copy</button></div><pre><code>${safeCode}</code></pre></div>`
+}
+
+function setupMarked() {
+  try {
+    marked.setOptions({ gfm: true, breaks: true })
+    marked.use({
+      renderer: {
+        code(this: any, code: string, infostring: string | undefined, _escaped: boolean) {
+          return markedCopyable(code, infostring)
+        }
+      } as any
+    })
+  } catch {}
+}
+
+setupMarked()
+
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes Native chat — v0.10.0', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — v0.11.0', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -86,6 +123,7 @@ export default function ChatPanel() {
             content: m.content,
             ts: m.created,
             id: m.id,
+            tokens: m.tokens,
           }))
           setMessages(prev => {
             const boot = prev.filter(p => p.ts === 'boot')
@@ -108,6 +146,28 @@ export default function ChatPanel() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, busy])
+
+  const ensureSession = async (): Promise<string | null> => {
+    if (currentSession) return currentSession
+    const title = input.trim().slice(0, 60) || 'New Session'
+    try {
+      const resp = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      })
+      const data = await resp.json()
+      if (data.id) {
+        setSessions(prev => [data, ...prev])
+        setCurrentSession(data.id)
+        setMessages(prev => prev.filter(p => p.ts === 'boot'))
+        return data.id
+      }
+    } catch (e) {
+      console.error('ensure session', e)
+    }
+    return null
+  }
 
   const createSession = async () => {
     const title = input.trim() || 'New Session'
@@ -156,6 +216,17 @@ export default function ChatPanel() {
     }
   }
 
+  const deleteMessage = async (msgId: number | undefined) => {
+    if (!msgId) return
+    if (!window.confirm('Delete this message?')) return
+    try {
+      await fetch(`/api/messages/${msgId}`, { method: 'DELETE' })
+      setMessages(prev => prev.filter(m => m.id !== msgId))
+    } catch (e) {
+      console.error('delete msg', e)
+    }
+  }
+
   // Search
   useEffect(() => {
     if (!searchOpen) return
@@ -200,6 +271,14 @@ export default function ChatPanel() {
 
   const send = async () => {
     if (!input.trim() || busy || streamingRef.current) return
+
+    // Auto-create session if none selected
+    const activeSession = await ensureSession()
+    if (!activeSession) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Error: could not create session', ts: new Date().toISOString() }])
+      return
+    }
+
     const userMsg: Message = { role: 'user', content: input.trim(), ts: new Date().toISOString() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
@@ -207,12 +286,10 @@ export default function ChatPanel() {
     streamingRef.current = true
 
     // Update session title from first message if still 'Untitled' or default
-    if (currentSession) {
-      const s = sessions.find(s => s.id === currentSession)
-      if (s && (s.title === 'Untitled' || s.title === 'New Session')) {
-        const autoTitle = userMsg.content.slice(0, 40)
-        renameSession(currentSession, autoTitle || 'Session')
-      }
+    const s = sessions.find(s => s.id === activeSession)
+    if (s && (s.title === 'Untitled' || s.title === 'New Session')) {
+      const autoTitle = userMsg.content.slice(0, 40)
+      renameSession(activeSession, autoTitle || 'Session')
     }
 
     const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/chat`
@@ -222,7 +299,7 @@ export default function ChatPanel() {
     let streamingIndex = -1
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ message: userMsg.content, session_id: currentSession }))
+      ws.send(JSON.stringify({ message: userMsg.content, session_id: activeSession }))
     }
 
     ws.onmessage = (event) => {
@@ -264,7 +341,7 @@ export default function ChatPanel() {
 
     ws.onerror = () => {
       ws.close()
-      fallbackHTTP(userMsg)
+      fallbackHTTP(userMsg, activeSession)
     }
 
     ws.onclose = () => {
@@ -276,12 +353,12 @@ export default function ChatPanel() {
     }
   }
 
-  const fallbackHTTP = async (userMsg: Message) => {
+  const fallbackHTTP = async (userMsg: Message, sid: string | null) => {
     try {
       const resp = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg.content, session_id: currentSession }),
+        body: JSON.stringify({ message: userMsg.content, session_id: sid }),
       })
       const data = await resp.json()
       const assistantMsg: Message = {
@@ -320,6 +397,15 @@ export default function ChatPanel() {
     }
   }
 
+  const jumpToSearchResult = (r: SearchResult) => {
+    if (r.session_id) {
+      setCurrentSession(r.session_id)
+    }
+    setSearchOpen(false)
+    setSearchQuery('')
+    setSearchResults([])
+  }
+
   return (
     <div className="chat-wrap">
       {searchOpen && (
@@ -335,14 +421,14 @@ export default function ChatPanel() {
             <div className="search-results">
               {searchResults.length === 0 && searchQuery && <div className="search-empty">No results</div>}
               {searchResults.map(r => (
-                <div key={r.id} className="search-result">
+                <div key={r.id} className="search-result" onClick={() => jumpToSearchResult(r)} title="Jump to session">
                   <span className="sr-role">{r.role === 'user' ? '◉' : '🜹'}</span>
                   <span className="sr-content">{r.content.slice(0, 120)}</span>
                   <span className="sr-ts">{new Date(r.created).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               ))}
             </div>
-            <div className="search-hint">ESC to close · Ctrl+N new session</div>
+            <div className="search-hint">ESC to close · Click result to jump · Ctrl+N new session</div>
           </div>
         </div>
       )}
@@ -380,8 +466,14 @@ export default function ChatPanel() {
             <div key={i} className={`chat-msg chat-${m.role}`}>
               <span className="chat-role">{m.role === 'system' ? '◈' : m.role === 'user' ? '◉' : '🜹'}</span>
               <div className="chat-bubble">
-                <span className={`chat-body ${m.streaming ? 'streaming' : ''}`} dangerouslySetInnerHTML={{ __html: marked.parse(m.content || '') }} />
-                <span className="chat-ts">{formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}</span>
+                <span className={`chat-body ${m.streaming ? 'streaming' : ''}`} dangerouslySetInnerHTML={{ __html: parseMarkdown(m.content || '') }} />
+                <span className="chat-ts">
+                  {formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}
+                  {m.tokens !== undefined && m.tokens > 0 && <span className="token-badge">{m.tokens}t</span>}
+                  {m.id && m.role !== 'system' && (
+                    <button className="msg-del" onClick={() => deleteMessage(m.id)} title="Delete message">×</button>
+                  )}
+                </span>
               </div>
             </div>
           ))}

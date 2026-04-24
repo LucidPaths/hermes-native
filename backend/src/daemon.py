@@ -1,6 +1,6 @@
 """
 Hermes Native — Backend Daemon
-v0.10.0 — Chat Sessions + Full-Text Search
+v0.11.0 — UX Polish: jump-to-search, auto-sessions, copy code, message deletion
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
@@ -53,7 +53,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.10.0"  # always use current version
+            data["version"] = "0.11.0"  # always use current version
             return data
         except Exception:
             pass
@@ -681,6 +681,20 @@ app.router.add_get("/api/sessions/{id}", session_get)
 app.router.add_delete("/api/sessions/{id}", session_delete)
 app.router.add_patch("/api/sessions/{id}", session_rename)
 app.router.add_get("/api/search", search_get)
+
+# DELETE single message
+async def message_delete(request):
+    """Delete a single message by id."""
+    try:
+        mid = request.match_info.get("id")
+        if not mid:
+            return web.json_response({"error": "no id"}, status=400)
+        db.delete_message(int(mid))
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+app.router.add_delete("/api/messages/{id}", message_delete)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware

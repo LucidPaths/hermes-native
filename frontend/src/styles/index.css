@@ -556,6 +556,71 @@ html, body, #root {
   background: none;
   padding: 0;
 }
+
+/* code block wrapper */
+.code-block-wrap {
+  position: relative;
+  margin: 6px 0;
+}
+.code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-bottom: none;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  font-size: 10px;
+  font-family: var(--font-mono);
+}
+.code-lang {
+  color: var(--text-faint);
+  text-transform: uppercase;
+}
+.code-copy {
+  background: none;
+  border: 1px solid var(--border-2);
+  color: var(--text-faint);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+}
+.code-copy:hover {
+  border-color: var(--accent-dim);
+  color: var(--accent);
+}
+.code-block-wrap pre {
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  margin: 0;
+}
+
+/* message token badge */
+.token-badge {
+  font-size: 9px;
+  color: var(--text-faint);
+  margin-left: 6px;
+  font-family: var(--font-mono);
+}
+
+/* message delete button */
+.msg-del {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 6px;
+  opacity: 0;
+  padding: 0 2px;
+}
+.chat-msg:hover .msg-del {
+  opacity: 1;
+}
+.msg-del:hover {
+  color: var(--hot);
+}
 .chat-body strong {
   color: var(--text);
   font-weight: 600;

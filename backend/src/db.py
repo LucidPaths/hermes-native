@@ -326,6 +326,12 @@ def get_messages_by_session(session_id: str, limit: int = 100):
     conn.close()
     return [dict(r) for r in rows]
 
+def delete_message(msg_id: int):
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("DELETE FROM messages WHERE id = ?", (msg_id,))
+    conn.commit()
+    conn.close()
+
 # ── Full-Text Search ────────────────────────
 
 def search_messages(query: str, limit: int = 50):
@@ -335,7 +341,7 @@ def search_messages(query: str, limit: int = 50):
     # Try FTS5 first
     try:
         rows = conn.execute(
-            """SELECT m.id, m.role, m.content, m.created, m.session_id
+            """SELECT m.id, m.role, m.content, m.created, m.session_id, m.tokens
                FROM messages_fts fts
                JOIN messages m ON m.id = fts.rowid
                WHERE messages_fts MATCH ?
@@ -346,7 +352,7 @@ def search_messages(query: str, limit: int = 50):
     except Exception:
         # Fallback to LIKE
         rows = conn.execute(
-            "SELECT id, role, content, created, session_id FROM messages WHERE content LIKE ? ORDER BY created DESC LIMIT ?",
+            "SELECT id, role, content, created, session_id, tokens FROM messages WHERE content LIKE ? ORDER BY created DESC LIMIT ?",
             (f"%{query}%", limit)
         ).fetchall()
     conn.close()

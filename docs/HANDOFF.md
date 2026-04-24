@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.10.0
+**Version:** v0.11.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -21,7 +21,28 @@ cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 ```
 
-### v0.10.0 (current)
+### v0.11.0 (current)
+- **UX Polish** — search-to-jump, auto-sessions, copy code, token badges, message deletion
+  - Clickable search results: click result → jump directly to its session
+  - Auto-create session: if no session selected when sending chat, new session auto-created + titled from first message
+  - Code block copy buttons: every rendered code block gets a "Copy" header with language tag
+  - Per-message token badge: shows token count next to each message timestamp
+  - Message deletion: hover any message → × button appears; DELETE `/api/messages/{id}` removes from DB + SQLite
+- Version bumped to v0.11.0; frontend rebuilt
+
+### v0.10.0
+- **Chat Sessions** — isolate conversations into named sessions persisted in SQLite
+  - `sessions` table with id, title, timestamps, metadata
+  - API: `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}`, `DELETE /api/sessions/{id}`
+  - Messages saved with `session_id`; session-scoped loading
+  - ChatPanel sidebar: switch sessions, create new, delete, auto-title from first message
+- **Full-Text Search** — SQLite FTS5 over message contents with fallback LIKE
+  - API: `GET /api/search?q=...&limit=...`
+  - Frontend: Ctrl+F opens global search overlay; live debounced results
+  - FTS5 auto-created + backfilled on DB migration
+- **DB Stats expanded** — `/api/stats` now includes `sessions` count
+
+### v0.10.0
 - **Chat Sessions** — isolate conversations into named sessions persisted in SQLite
   - `sessions` table with id, title, timestamps, metadata
   - API: `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `PATCH /api/sessions/{id}`, `DELETE /api/sessions/{id}`
@@ -151,11 +172,9 @@ Browser (localhost:8789)
 ## What's Not Built (future sprints)
 
 - [ ] Ngrok/Tailscale tunnel for remote access from outside LAN
-- [ ] Systemd service for auto-start on boot
 - [ ] Desktop packaging (electron/tauri when rust available)
-- [ ] Phone hamburger menu for mobile nav
+- [ ] Token count display per message ✅ DONE v0.11.0
 - [ ] Markdown rendering in chat messages ✅ DONE v0.7.2
-- [ ] Token count display in status panel
 - [ ] Export chat/session to markdown file ✅ DONE v0.7.1
 - [ ] Model switching in UI ✅ DONE v0.7.1
 - [ ] Systemd service for auto-start on boot ✅ DONE v0.7.2
