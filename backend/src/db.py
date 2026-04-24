@@ -12,6 +12,28 @@ DB_DIR = Path.home() / ".hermes-native" / "state"
 DB_DIR.mkdir(parents=True, exist_ok=True)
 DB_PATH = DB_DIR / "memory.db"
 
+# ── Token counting (best-effort; uses tiktoken if available) ──
+_enc = None
+
+def _get_enc():
+    global _enc
+    if _enc is None:
+        try:
+            import tiktoken
+            _enc = tiktoken.get_encoding("cl100k_base")
+        except Exception:
+            _enc = None
+    return _enc
+
+def _count_tokens(text: str) -> int:
+    if not text:
+        return 0
+    enc = _get_enc()
+    if enc:
+        return len(enc.encode(text))
+    # rough fallback: ~0.75 words per token
+    return int(len(text.split()) * 1.33)
+
 SCHEMA = """
 -- messages: chat conversation
 CREATE TABLE IF NOT EXISTS messages (
@@ -20,7 +42,8 @@ CREATE TABLE IF NOT EXISTS messages (
     content TEXT NOT NULL,
     created TEXT NOT NULL,        -- ISO datetime
     session_id TEXT,              -- optional client session
-    metadata TEXT               -- JSON blob
+    metadata TEXT,               -- JSON blob
+    tokens INTEGER DEFAULT 0
 );
 
 -- tasks: task queue history
@@ -60,11 +83,13 @@ def now_iso():
 
 # ──────────────────────── Messages ────────────────────────
 
-def save_message(role: str, content: str, session_id: str = None, metadata: dict = None):
+def save_message(role: str, content: str, session_id: str = None, metadata: dict = None, tokens: int = None):
+    if tokens is None:
+        tokens = _count_tokens(content)
     conn = sqlite3.connect(DB_PATH)
     conn.execute(
-        "INSERT INTO messages (role, content, created, session_id, metadata) VALUES (?, ?, ?, ?, ?)",
-        (role, content, now_iso(), session_id or "", json.dumps(metadata or {}))
+        "INSERT INTO messages (role, content, created, session_id, metadata, tokens) VALUES (?, ?, ?, ?, ?, ?)",
+        (role, content, now_iso(), session_id or "", json.dumps(metadata or {}), tokens)
     )
     conn.commit()
     conn.close()
@@ -78,6 +103,12 @@ def get_messages(limit: int = 100, offset: int = 0):
     ).fetchall()
     conn.close()
     return [dict(r) for r in rows]
+
+def get_total_tokens():
+    conn = sqlite3.connect(DB_PATH)
+    result = conn.execute("SELECT COALESCE(SUM(tokens), 0) FROM messages").fetchone()[0]
+    conn.close()
+    return int(result)
 
 def clear_messages():
     conn = sqlite3.connect(DB_PATH)

@@ -7,6 +7,7 @@ interface State {
   tasks_queued: number
   model: string
   provider: string
+  tokens?: number
   mood?: {
     label: string
     murmur: string
@@ -22,6 +23,7 @@ export default function StatusPanel({ state }: { state: State | null }) {
     { k: 'model', v: state.model },
     { k: 'pulses', v: String(state.pulse_count) },
     { k: 'queued', v: String(state.tasks_queued || 0) },
+    { k: 'tokens', v: String(state.tokens || 0) },
     { k: 'last pulse', v: state.last_pulse ? new Date(state.last_pulse).toLocaleTimeString() : '—' },
     { k: 'provider', v: state.provider },
   ]

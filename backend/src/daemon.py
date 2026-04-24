@@ -1,9 +1,10 @@
 """
 Hermes Native — Backend Daemon
-v0.6.0 — WebSocket Streaming Chat + Mood Engine
+v0.9.0 — Plugin System + Token Tracking
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
+Plugin hooks: pre_chat, post_chat, pre_task, post_task, on_pulse, on_mood_change.
 REST API + SSE + WS on :8789
 """
 import asyncio
@@ -31,6 +32,11 @@ try:
 except ImportError:
     mood = None
 
+try:
+    import plugins
+except ImportError:
+    plugins = None
+
 STATE_DIR = Path.home() / ".hermes-native" / "state"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "daemon.json"
@@ -47,12 +53,12 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.8.1"  # always use current version
+            data["version"] = "0.9.0"  # always use current version
             return data
         except Exception:
             pass
     return {
-        "version": "0.8.0",
+        "version": "0.9.0",
         "booted": now(),
         "last_pulse": None,
         "next_pulse": None,
@@ -96,6 +102,23 @@ hub = BroadcastHub()
 state = load_state()
 state_lock = asyncio.Lock()
 
+# ── Plugin Registry ──
+_plugin_registry = None
+
+def _get_plugins():
+    global _plugin_registry
+    if _plugin_registry is None and plugins:
+        try:
+            _plugin_registry = plugins.get_registry()
+        except Exception as e:
+            print(f"[plugin] registry init error: {e}")
+            _plugin_registry = None
+    return _plugin_registry
+
+# ── Helpers ──
+def _prev_mood_label():
+    return state.get("__prev_mood", "idle")
+
 # ── Init DB ──
 if db:
     try:
@@ -122,6 +145,21 @@ async def pulse():
             db.save_pulse(state["pulse_count"], state["status"], dict(state))
         except Exception as e:
             print(f"[db] save_pulse error: {e}")
+    # Plugin: on_pulse + on_mood_change
+    registry = _get_plugins()
+    if registry:
+        try:
+            registry.run("on_pulse", state=dict(state))
+        except Exception as e:
+            print(f"[plugin] on_pulse error: {e}")
+        try:
+            cur_mood = _get_cached_mood()
+            prev = state.get("__prev_mood", "idle")
+            if cur_mood["label"] != prev:
+                state["__prev_mood"] = cur_mood["label"]
+                registry.run("on_mood_change", state=dict(state), mood=cur_mood, prev=prev)
+        except Exception as e:
+            print(f"[plugin] on_mood_change error: {e}")
     await hub.push({"type": "pulse", "data": state})
     return state
 
@@ -178,6 +216,11 @@ async def _run_hermes_task(task_id: str, desc: str):
                 db.save_task(task_id, desc, "done", response_text[:500])
             except Exception as e:
                 print(f"[db] save_task error: {e}")
+        # Plugin: post_task
+        registry = _get_plugins()
+        if registry:
+            try: registry.run("post_task", task_id=task_id, description=desc, status="done", result=response_text[:500], state=dict(state))
+            except Exception as e: print(f"[plugin] post_task error: {e}")
     except Exception as e:
         async with state_lock:
             for t in state["task_queue"]:
@@ -194,6 +237,11 @@ async def _run_hermes_task(task_id: str, desc: str):
                 db.save_task(task_id, desc, "error", error=str(e)[:300])
             except Exception as e2:
                 print(f"[db] save_task error: {e2}")
+        # Plugin: post_task
+        registry = _get_plugins()
+        if registry:
+            try: registry.run("post_task", task_id=task_id, description=desc, status="error", result=str(e)[:300], state=dict(state))
+            except Exception as pe: print(f"[plugin] post_task error: {pe}")
     await hub.push({"type": "state", "data": dict(state)})
 
 async def task_history_get(request):
@@ -207,11 +255,12 @@ async def task_history_get(request):
 
 async def task_post(request):
     body = await request.json()
+    desc = body.get("description", "")
     async with state_lock:
         state["task_counter"] = state.get("task_counter", 0) + 1
         task = {
             "id": f"t{state['pulse_count']}x{state['task_counter']}",
-            "desc": body.get("description", ""),
+            "desc": desc,
             "status": "pending",
             "created": now(),
         }
@@ -224,6 +273,13 @@ async def task_post(request):
             db.save_task(task["id"], task["desc"], "pending")
         except Exception as e:
             print(f"[db] save_task init error: {e}")
+    # Plugin: pre_task
+    registry = _get_plugins()
+    if registry:
+        try:
+            registry.run("pre_task", task=task, state=dict(state))
+        except Exception as e:
+            print(f"[plugin] pre_task error: {e}")
     await hub.push({"type": "task", "data": task})
     asyncio.create_task(_run_hermes_task(task["id"], task["desc"]))
     return web.json_response(task)
@@ -305,6 +361,7 @@ async def state_get(request):
         s = dict(state)
         s["mood"] = _get_cached_mood()
         s["tasks_queued"] = len(state.get("task_queue", []))
+        s["tokens"] = db.get_total_tokens() if db else 0
         return web.json_response(s)
 
 async def stats_get(request):
@@ -357,6 +414,12 @@ async def chat_post(request):
     msg = body.get("message", "").strip()
     if not msg:
         return web.json_response({"error": "empty message"}, status=400)
+    registry = _get_plugins()
+    if registry:
+        try:
+            registry.run("pre_chat", message=msg, state=dict(state))
+        except Exception as e:
+            print(f"[plugin] pre_chat error: {e}")
     try:
         result = subprocess.run(
             ["/home/lucid/.local/bin/hermes", "chat", "-q", msg, "-Q", "--yolo", "--accept-hooks", "--pass-session-id"],
@@ -376,6 +439,12 @@ async def chat_post(request):
                 })
             except Exception as e:
                 print(f"[db] save_message error: {e}")
+        # Plugin: post_chat
+        if registry:
+            try:
+                registry.run("post_chat", message=msg, response=response_text, state=dict(state))
+            except Exception as e:
+                print(f"[plugin] post_chat error: {e}")
         # Broadcast to SSE listeners
         await hub.push({"type": "chat", "data": {"role": "user", "content": msg, "t": now()}})
         await hub.push({"type": "chat", "data": {"role": "assistant", "content": response_text, "t": now()}})
@@ -425,6 +494,12 @@ async def ws_chat(request):
                 try: db.save_message("user", user_msg, metadata={"source": "native"})
                 except Exception as e: print(f"[db] ws user msg error: {e}")
             
+            # Plugin: pre_chat
+            registry = _get_plugins()
+            if registry:
+                try: registry.run("pre_chat", message=user_msg, state=dict(state))
+                except Exception as e: print(f"[plugin] ws pre_chat error: {e}")
+            
             await hub.push({"type": "chat", "data": {"role": "user", "content": user_msg, "t": now()}})
             await ws.send_str(json.dumps({"type": "start", "text": "⏤"}))
             
@@ -454,11 +529,14 @@ async def ws_chat(request):
                 full_text = "\n".join(chunks).strip()
                 session_id = stderr.decode().strip().replace("session_id: ", "") if "session_id" in stderr.decode() else None
                 
-                # Persist full response
+                # Persist full response + plugin
                 if db:
                     try: db.save_message("assistant", full_text, metadata={"source": "native", "session_id": session_id})
                     except Exception as e: print(f"[db] ws assistant msg error: {e}")
-                
+                if registry:
+                    try: registry.run("post_chat", message=user_msg, response=full_text, state=dict(state))
+                    except Exception as e: print(f"[plugin] ws post_chat error: {e}")
+
                 await hub.push({"type": "chat", "data": {"role": "assistant", "content": full_text, "t": now()}})
                 await ws.send_str(json.dumps({"type": "done", "text": full_text}))
                 
@@ -495,6 +573,11 @@ async def tunnel_status(request):
     url = url_file.read_text().strip() if url_file.exists() else None
     return web.json_response({"running": running, "url": url})
 
+async def tokens_get(request):
+    """Return total token count across all messages."""
+    total = db.get_total_tokens() if db else 0
+    return web.json_response({"total_tokens": total})
+
 # ── Routes ──
 app = web.Application()
 app.router.add_get("/", index)
@@ -516,6 +599,8 @@ app.router.add_get("/api/export/chat", export_chat)
 app.router.add_post("/api/chat/clear", clear_chat)
 app.router.add_get("/api/stats", stats_get)
 app.router.add_get("/api/tunnel", tunnel_status)
+
+app.router.add_get("/api/tokens", tokens_get)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware
