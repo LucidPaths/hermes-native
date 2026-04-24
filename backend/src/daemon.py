@@ -1,6 +1,6 @@
 """
 Hermes Native — Backend Daemon
-v0.14.0 — Session-scoped export, search improvements, connection status
+v0.15.0 — inline session rename, dark-mode auto-detect, message actions
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
@@ -54,7 +54,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.14.0"  # always use current version
+            data["version"] = "0.15.0"  # always use current version
             return data
         except Exception:
             pass

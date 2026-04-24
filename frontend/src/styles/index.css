@@ -393,6 +393,17 @@ html, body, #root {
 .cs-item:hover .cs-del { opacity: 1; }
 .cs-del:hover { color: var(--hot); }
 
+.cs-edit-input {
+  background: var(--surface-3);
+  border: 1px solid var(--accent-dim);
+  color: var(--text);
+  font-size: 12px;
+  padding: 2px 4px;
+  border-radius: var(--radius-sm);
+  width: calc(100% - 20px);
+  outline: none;
+}
+
 .cs-empty {
   font-size: 11px;
   color: var(--text-faint);

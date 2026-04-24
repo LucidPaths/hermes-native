@@ -36,7 +36,11 @@ interface PulseState {
 export default function App() {
   const [state, setState] = useState<PulseState | null>(null)
   const [tab, setTab] = useState<Tab>('chat')
-  const [dark, setDark] = useState(true)
+  const [dark, setDark] = useState(() => {
+    try {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches
+    } catch { return true }
+  })
   const [menuOpen, setMenuOpen] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
   const [connected, setConnected] = useState(false)
@@ -92,7 +96,7 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.14.0</span>
+          <span className="ver">v0.15.0</span>
           <span className={`conn-dot ${connected ? 'conn-on' : 'conn-off'}`} title={connected ? 'Online' : 'Offline'}></span>
         </div>
         <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">

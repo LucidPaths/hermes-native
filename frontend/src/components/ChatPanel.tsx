@@ -78,7 +78,7 @@ setupMarked()
 
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes Native chat — v0.14.0', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — v0.15.0', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -96,6 +96,8 @@ export default function ChatPanel() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [editingSession, setEditingSession] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   // Load sessions
@@ -512,11 +514,33 @@ export default function ChatPanel() {
               className={`cs-item ${currentSession === s.id ? 'active' : ''}`}
               onClick={() => setCurrentSession(s.id)}
             >
-              <div className="cs-title-text">{s.title}</div>
-              <div className="cs-meta">
-                <span>{new Date(s.updated_at).toLocaleDateString()}</span>
-                <span className="cs-counts">{s.message_count ?? 0} msgs · {(s.token_count ?? 0).toLocaleString()}t</span>
-              </div>
+              {editingSession === s.id ? (
+                <input
+                  value={editTitle}
+                  onChange={e => setEditTitle(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') { renameSession(s.id, editTitle); setEditingSession(null); }
+                    if (e.key === 'Escape') { setEditingSession(null); }
+                  }}
+                  onBlur={() => { renameSession(s.id, editTitle); setEditingSession(null); }}
+                  autoFocus
+                  className="cs-edit-input"
+                  onClick={e => e.stopPropagation()}
+                />
+              ) : (
+                <>
+                  <div
+                    className="cs-title-text"
+                    onDoubleClick={e => { e.stopPropagation(); setEditingSession(s.id); setEditTitle(s.title); }}
+                  >
+                    {s.title}
+                  </div>
+                  <div className="cs-meta">
+                    <span>{new Date(s.updated_at).toLocaleDateString()}</span>
+                    <span className="cs-counts">{s.message_count ?? 0} msgs · {(s.token_count ?? 0).toLocaleString()}t</span>
+                  </div>
+                </>
+              )}
               <button className="cs-del" onClick={e => { e.stopPropagation(); deleteSession(s.id); }} title="Delete">×</button>
             </div>
           ))}
