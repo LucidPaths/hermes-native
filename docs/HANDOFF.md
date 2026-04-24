@@ -21,6 +21,9 @@ cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 ```
 
+- [x] **Plugin system** — auto-discovery hooks, logger plugin sample in `plugins/`
+- [x] **Token tracking** — `/api/tokens`, `state_get` includes `"tokens"`
+
 ### v0.8.1 (current)
 - **Remote tunnel integration** — `scripts/tunnel.sh` wraps `npx localtunnel`, stores URL in `~/.hermes-native/state/tunnel.url`
 - **Tunnel status API** — `GET /api/tunnel` returns `{running, url}`

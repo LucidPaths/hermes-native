@@ -11,7 +11,7 @@ interface Task {
 }
 
 export default function TaskStream() {
-  const [tasks, setTasks] = useState<Task[]>([])
+  const [taskMap, setTaskMap] = useState<Record<string, Task>>({})
   const [input, setInput] = useState('')
   const [lastEvent, setLastEvent] = useState<string | null>(null)
   const wsRef = useRef<EventSource | null>(null)
@@ -21,7 +21,11 @@ export default function TaskStream() {
     fetch('/api/tasks/history?limit=50')
       .then(r => r.json())
       .then((data: Task[]) => {
-        if (Array.isArray(data)) setTasks(data)
+        if (Array.isArray(data)) {
+          const map: Record<string, Task> = {}
+          data.forEach(t => { map[t.id] = t })
+          setTaskMap(map)
+        }
       })
       .catch(() => {})
   }, [])
@@ -32,23 +36,20 @@ export default function TaskStream() {
       const msg = JSON.parse(e.data)
       if (msg.type === 'state') {
         const q = msg.data.task_queue || []
-        setTasks(prev => {
-          // Merge: keep DB history + append live running/pending items
-          const liveIds = new Set(q.map((t: Task) => t.id))
-          const archived = prev.filter(t => !liveIds.has(t.id))
-          return [...archived, ...q]
+        setTaskMap(prev => {
+          const next = { ...prev }
+          q.forEach((t: Task) => {
+            next[t.id] = { ...(next[t.id] || {}), ...t }
+          })
+          return next
         })
         setLastEvent(new Date().toLocaleTimeString())
       }
       if (msg.type === 'task') {
-        setTasks(prev => {
-          const existing = prev.findIndex(t => t.id === msg.data.id)
-          if (existing >= 0) {
-            const copy = [...prev]
-            copy[existing] = { ...copy[existing], ...msg.data }
-            return copy
-          }
-          return [...prev, msg.data]
+        setTaskMap(prev => {
+          const id = msg.data.id || msg.data.task_key
+          if (!id) return prev
+          return { ...prev, [id]: { ...(prev[id] || {}), ...msg.data } }
         })
       }
     }
@@ -56,6 +57,12 @@ export default function TaskStream() {
     wsRef.current = es
     return () => es.close()
   }, [])
+
+  const tasks = Object.values(taskMap).sort((a, b) => {
+    const ta = a.completed || a.created || ''
+    const tb = b.completed || b.created || ''
+    return tb.localeCompare(ta)
+  })
 
   const sendTask = async () => {
     if (!input.trim()) return

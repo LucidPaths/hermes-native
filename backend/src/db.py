@@ -71,12 +71,24 @@ CREATE TABLE IF NOT EXISTS pulses (
 -- materialized by query, not stored
 """
 
-def init_db():
+def migrate_db():
+    """Lightweight migrations: add missing columns, then init schema."""
+    conn = sqlite3.connect(DB_PATH, timeout=10)
+    cursor = conn.execute("PRAGMA table_info(messages)")
+    columns = {row[1] for row in cursor.fetchall()}
+    if "tokens" not in columns:
+        print("[db] migrating: adding messages.tokens column")
+        conn.execute("ALTER TABLE messages ADD COLUMN tokens INTEGER DEFAULT 0")
+        conn.commit()
+    conn.close()
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.executescript(SCHEMA)
     conn.commit()
     conn.close()
     return DB_PATH
+
+# Alias for backwards compat
+init_db = migrate_db
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat()

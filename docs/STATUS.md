@@ -1,10 +1,24 @@
 # Status — Hermes Native
 
-Current: v0.8.1
+Current: v0.9.0
 
 ## What's Built ✅
 
-### v0.8.1 (current)
+### v0.9.0 (current)
+- [x] **Plugin system wired into daemon** — every lifecycle hook fires:
+  - `pre_chat`, `post_chat`, `pre_task`, `post_task`, `on_pulse`, `on_mood_change`
+- [x] **Token tracking** — `messages.tokens` column with tiktoken (cl100k_base) + fallback
+  - `save_message` auto-counts tokens on insert
+  - `/api/tokens` endpoint returns `total_tokens`
+  - `state_get` includes `"tokens"` field
+  - DB migration: auto-adds `tokens` column to existing DBs
+  - Backfills tokens for historical messages
+- [x] **StatusPanel token display** — shows total token count alongside pulses/queued
+- [x] **Sample logger plugin** — `~/.hermes-native/plugins/logger.py` logs all hooks to `plugins.log`
+- [x] **TaskStream dedup fix** — uses map by task ID instead of array append for stable live updates
+- [x] **Version bumped** — v0.9.0 across frontend + backend
+
+### v0.8.1
 - [x] **Remote tunnel integration** — `scripts/tunnel.sh` wraps `npx localtunnel`, stores URL in `~/.hermes-native/state/tunnel.url`
 - [x] **Tunnel status API** — `GET /api/tunnel` returns `{running, url}`
 - [x] **Tunnel display in Settings** — SettingsPanel fetches `/api/tunnel`, shows active URL with hyperlink
@@ -78,7 +92,8 @@ Current: v0.8.1
 - [x] React + Vite + TypeScript frontend
 - [x] PulseOrb, StatusPanel, TaskStream, ChatPanel
 - [x] Dark void aesthetic + mobile responsive
-- [x] Hermes agent bridge via subprocess
+- Status panel shows mood label + murmur
+- [x] **Systemd user service** — `hermes-native.service` with venv Python, auto-restart
 
 ## End-to-End Verified ✅
 
@@ -98,6 +113,8 @@ Current: v0.8.1
 | Systemd | systemctl --user status | running, auto-restart |
 | DB stats | /api/stats | live counts |
 | Chat clear | POST /api/chat/clear | messages purged |
+| Tokens | /api/tokens | total_tokens returns int |
+| Plugin hooks | logger plugin in plugins/ | plugins.log written |
 
 ## Running
 
