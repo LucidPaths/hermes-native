@@ -154,6 +154,27 @@ def get_timeline(limit: int = 100):
     conn.close()
     items.sort(key=lambda x: x["t"], reverse=True)
     return items[:limit]
+# ──────────────────────── Export / Stats ────────────────────────
+
+def export_chat_to_markdown(path: Path):
+    msgs = get_messages(limit=10000)
+    lines = ["# Hermes Native — Chat Export\n", f"Generated: {datetime.now(timezone.utc).isoformat()}\n\n"]
+    for m in msgs:
+        role = m["role"]
+        content = m["content"]
+        ts = m["created"]
+        lines.append(f"## {'👤' if role=='user' else '🜹'} {role.capitalize()} ({ts})\n\n{content}\n\n---\n\n")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("".join(lines))
+    return str(path)
+
+def get_db_stats():
+    conn = sqlite3.connect(DB_PATH)
+    msgs = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+    tasks = conn.execute("SELECT COUNT(*) FROM tasks").fetchone()[0]
+    pulses = conn.execute("SELECT COUNT(*) FROM pulses").fetchone()[0]
+    conn.close()
+    return {"messages": msgs, "tasks": tasks, "pulses": pulses, "db_path": str(DB_PATH)}
 
 if __name__ == "__main__":
     init_db()

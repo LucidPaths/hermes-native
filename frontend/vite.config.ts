@@ -3,6 +3,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 8788, host: '0.0.0.0', proxy: { '/api': { target: 'http://127.0.0.1:8789', changeOrigin: true }, '/events': { target: 'http://127.0.0.1:8789', changeOrigin: true } } },
+  server: { port: 8788, host: '0.0.0.0', proxy: { '/api': { target: 'http://127.0.0.1:8789', changeOrigin: true }, '/events': { target: 'http://127.0.0.1:8789', changeOrigin: true }, '/ws': { target: 'http://127.0.0.1:8789', changeOrigin: true, ws: true } } },
   build: { outDir: 'dist' },
 })

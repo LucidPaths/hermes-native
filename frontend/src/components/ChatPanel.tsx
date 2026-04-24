@@ -12,17 +12,26 @@ interface Message {
   content: string
   ts: string
   id?: number
+  streaming?: boolean
+}
+
+interface WSMessage {
+  type: 'start' | 'chunk' | 'done' | 'error'
+  text: string
 }
 
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes Native chat — history persists', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — streaming v0.6.0', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const wsRef = useRef<WebSocket | null>(null)
+  const streamingRef = useRef(false)
 
+  // Load persistent history
   useEffect(() => {
     fetch('/api/chat/history?limit=50')
       .then(r => r.json())
@@ -49,12 +58,76 @@ export default function ChatPanel() {
   }, [messages, busy])
 
   const send = async () => {
-    if (!input.trim() || busy) return
+    if (!input.trim() || busy || streamingRef.current) return
     const userMsg: Message = { role: 'user', content: input.trim(), ts: new Date().toISOString() }
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setBusy(true)
+    streamingRef.current = true
 
+    // Try WebSocket first
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/chat`
+    let ws = new WebSocket(wsUrl)
+    wsRef.current = ws
+
+    let streamingIndex = -1
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ message: userMsg.content }))
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const msg: WSMessage = JSON.parse(event.data)
+        if (msg.type === 'start') {
+          const assistantMsg: Message = { role: 'assistant', content: '', ts: new Date().toISOString(), streaming: true }
+          setMessages(prev => {
+            streamingIndex = prev.length
+            return [...prev, assistantMsg]
+          })
+        } else if (msg.type === 'chunk') {
+          setMessages(prev => {
+            const updated = [...prev]
+            if (streamingIndex >= 0 && updated[streamingIndex]) {
+              updated[streamingIndex] = { ...updated[streamingIndex], content: updated[streamingIndex].content + (msg.text ? msg.text + ' ' : '') }
+            }
+            return updated
+          })
+        } else if (msg.type === 'done') {
+          setMessages(prev => {
+            const updated = [...prev]
+            if (streamingIndex >= 0 && updated[streamingIndex]) {
+              updated[streamingIndex] = { ...updated[streamingIndex], content: msg.text || updated[streamingIndex].content, streaming: false }
+            }
+            return updated
+          })
+          ws.close()
+          setBusy(false)
+          streamingRef.current = false
+        } else if (msg.type === 'error') {
+          setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${msg.text}`, ts: new Date().toISOString() }])
+          ws.close()
+          setBusy(false)
+          streamingRef.current = false
+        }
+      } catch {}
+    }
+
+    ws.onerror = () => {
+      ws.close()
+      fallbackHTTP(userMsg)
+    }
+
+    ws.onclose = () => {
+      wsRef.current = null
+      if (streamingRef.current) {
+        streamingRef.current = false
+        setBusy(false)
+      }
+    }
+  }
+
+  const fallbackHTTP = async (userMsg: Message) => {
     try {
       const resp = await fetch('/api/chat', {
         method: 'POST',
@@ -76,6 +149,7 @@ export default function ChatPanel() {
       }])
     } finally {
       setBusy(false)
+      streamingRef.current = false
     }
   }
 
@@ -89,18 +163,18 @@ export default function ChatPanel() {
 
   return (
     <div className="chat-area">
-      <h2>Chat {loaded && <span className="tag">persisted</span>}</h2>
+      <h2>Chat {loaded && <span className="tag">streaming</span>}</h2>
       <div className="chat-history">
         {messages.map((m, i) => (
           <div key={i} className={`chat-msg chat-${m.role}`}>
             <span className="chat-role">{m.role === 'system' ? '◈' : m.role === 'user' ? '◉' : '🜹'}</span>
             <div className="chat-bubble">
-              <span className="chat-body">{m.content}</span>
-              <span className="chat-ts">{formatTime(m.ts)}</span>
+              <span className={`chat-body ${m.streaming ? 'streaming' : ''}`}>{m.content}</span>
+              <span className="chat-ts">{formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}</span>
             </div>
           </div>
         ))}
-        {busy && (
+        {busy && !streamingRef.current && (
           <div className="chat-msg chat-system">
             <span className="chat-role blink">🜹</span>
             <span className="chat-body">thinking...</span>

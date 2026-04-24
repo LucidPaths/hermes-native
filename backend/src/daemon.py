@@ -1,9 +1,10 @@
 """
 Hermes Native — Backend Daemon
-v0.5.0 — Task Auto-Cleanup + Live Chat Broadcasts
+v0.6.0 — WebSocket Streaming Chat + Mood Engine
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
-REST API + SSE on :8789
+Mood states via mood.py (dawn/idle/working/dusk/night/error).
+REST API + SSE + WS on :8789
 """
 import asyncio
 import json
@@ -25,6 +26,11 @@ try:
 except ImportError:
     db = None
 
+try:
+    import mood
+except ImportError:
+    mood = None
+
 STATE_DIR = Path.home() / ".hermes-native" / "state"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "daemon.json"
@@ -44,7 +50,7 @@ def load_state():
         except Exception:
             pass
     return {
-        "version": "0.5.0",
+        "version": "0.6.0",
         "booted": now(),
         "last_pulse": None,
         "next_pulse": None,
@@ -95,6 +101,10 @@ if db:
         print("[db] memory.db initialized")
     except Exception as e:
         print(f"[db] init error: {e}")
+
+# ── Mood state cache ──
+_current_mood = None
+_last_mood_at = 0
 
 async def pulse():
     async with state_lock:
@@ -217,15 +227,6 @@ async def task_post(request):
     asyncio.create_task(_run_hermes_task(task["id"], task["desc"]))
     return web.json_response(task)
 
-async def task_history_get(request):
-    """Get persistent task history from SQLite."""
-    limit = int(request.query.get("limit", "100"))
-    try:
-        tasks = db.get_tasks(limit=limit) if db else []
-        return web.json_response(tasks)
-    except Exception as e:
-        return web.json_response({"error": str(e)}, status=500)
-
 async def task_complete(request):
     body = await request.json()
     tid = body.get("task_id")
@@ -285,7 +286,33 @@ async def events(request):
     return resp
 
 async def health(_):
-    return web.json_response({"ok": True, "version": state["version"], "status": state["status"]})
+    m = _get_cached_mood()
+    return web.json_response({"ok": True, "version": state["version"], "status": state["status"], "mood": m["label"], "murmur": m["murmur"]})
+
+async def mood_get(_):
+    return web.json_response(_get_cached_mood())
+
+async def state_get(request):
+    async with state_lock:
+        s = dict(state)
+        s["mood"] = _get_cached_mood()
+        return web.json_response(s)
+
+def _get_cached_mood():
+    global _current_mood, _last_mood_at
+    import time
+    now_ts = time.time()
+    if _current_mood is None or now_ts - _last_mood_at > 60:
+        if mood:
+            try:
+                _current_mood = mood.mood_from_state(dict(state))
+                _last_mood_at = now_ts
+            except Exception as e:
+                print(f"[mood] error: {e}")
+                _current_mood = {"label": "idle", "murmur": "...", "color": "#00d4aa", "breathe_rate": 2.0}
+        else:
+            _current_mood = {"label": "idle", "murmur": "...", "color": "#00d4aa", "breathe_rate": 2.0}
+    return _current_mood
 
 async def chat_post(request):
     body = await request.json()
@@ -416,6 +443,7 @@ app.router.add_post("/api/pulse", pulse_post)
 app.router.add_post("/api/tasks", task_post)
 app.router.add_get("/api/tasks/history", task_history_get)
 app.router.add_post("/api/tasks/complete", task_complete)
+app.router.add_get("/api/mood", mood_get)
 app.router.add_post("/api/chat", chat_post)
 app.router.add_get("/api/chat/history", chat_history_get)
 app.router.add_get("/api/timeline", timeline_get)
