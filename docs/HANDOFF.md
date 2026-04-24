@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.8.1
+**Version:** v0.9.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -21,8 +21,17 @@ cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 ```
 
-- [x] **Plugin system** — auto-discovery hooks, logger plugin sample in `plugins/`
-- [x] **Token tracking** — `/api/tokens`, `state_get` includes `"tokens"`
+### v0.9.0 (current)
+- **Plugin system wired** — `pre_chat`, `post_chat`, `pre_task`, `post_task`, `on_pulse`, `on_mood_change` all fire
+  - Auto-discovery from `~/.hermes-native/plugins/*.py`
+  - Sample: `plugins/logger.py`
+- **Token tracking** — tiktoken `cl100k_base` + fallback
+  - `messages.tokens` column, auto-counted on save
+  - `/api/tokens` endpoint
+  - `state_get` includes `"tokens"`
+  - DB migration auto-adds column, backfills history
+- **TaskStream dedup fix** — map by ID, stable live updates
+- **Version bumped** — v0.9.0 across daemon + frontend + docs
 
 ### v0.8.1 (current)
 - **Remote tunnel integration** — `scripts/tunnel.sh` wraps `npx localtunnel`, stores URL in `~/.hermes-native/state/tunnel.url`
