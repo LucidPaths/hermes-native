@@ -1,8 +1,16 @@
 # Status — Hermes Native
 
-Current: v0.16.0
+Current: v0.17.0
 
 ## What's Built
+
+### v0.17.0 (current)
+- [x] **Multiline textarea input** -- replaced single-line `<input>` with auto-resizing `<textarea>` in ChatPanel; Shift+Enter for newlines, Enter sends; `ref={textareaRef}` with `autoResize` helper
+- [x] **Per-session draft persistence** -- `localStorage` key `hermes-native:drafts` stores a map of `session_id -> draft text`; restored automatically on session switch; cleared on send
+- [x] **Inline message editing** -- user messages get ✎ Edit button on hover; enters inline `<textarea>` with Save/Cancel; PATCH `/api/messages/{id}` updates DB content + tokens
+- [x] **Backend PATCH endpoint for messages** -- `update_message()` in db.py recalculates tiktoken count; PATCH `/api/messages/{id}` wired into daemon routes
+- [x] **Frontend rebuilt** -- latest dist with all v0.17.0 features
+- [x] **Version bumped** -- v0.17.0 across frontend + backend + docs
 
 ### v0.16.0 (current)
 - [x] **Stop streaming button** -- while assistant is streaming, send button becomes &times; Stop; clicking closes WebSocket, sets streaming=false, busy=false immediately

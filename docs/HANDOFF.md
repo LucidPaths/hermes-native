@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.15.0
+**Version:** v0.17.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -20,6 +20,12 @@ cd /home/lucid/workspace/hermes-native
 # Or directly:
 python3 backend/src/daemon.py
 ```
+
+### v0.17.0 (current)
+- **Multiline textarea input** -- Shift+Enter for newline, Enter to send; auto-resizes up to 200px height
+- **Per-session draft persistence** -- each session's compose box is saved in `localStorage` and restored on re-select
+- **Inline message editing** -- user messages get a ✎ Edit button; save hits PATCH `/api/messages/{id}`, recalculates tokens
+- Version bumped to v0.17.0; frontend rebuilt; daemon restarted
 
 ### v0.16.0 (current)
 - **Stop streaming button** -- while assistant is streaming, the send button becomes an `&times;` Stop button; clicking closes the WebSocket, sets `streaming=false`, and frees the input immediately
