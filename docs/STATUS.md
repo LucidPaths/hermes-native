@@ -1,12 +1,16 @@
 # Status — Hermes Native
 
-Current: v0.7.3
+Current: v0.8.0
 
 ## What's Built ✅
 
-### v0.7.3 (current)
+### v0.8.0 (current)
+- [x] **Mobile hamburger drawer** — hamburger icon on ≤768px, slide-in drawer from right with overlay, hides desktop tabs
+- [x] **Responsive nav** — all tabs accessible on phone: Chat, Tasks, Timeline, Settings, Light/Dark toggle
+
+### v0.7.3
 - [x] **DB Stats endpoint** — `/api/stats` returns message/task/pulse counts from SQLite
-- [x] **Chat clear** — "Clear" button (+ Ctrl+K shortcut) calls `/api/chat/clear`, purges DB messages
+- [x] **Chat clear** — "Clear" button + Ctrl+K shortcut calls `POST /api/chat/clear`, purges DB messages
 - [x] **Chat streaming fix** — chunks joined with `\n` instead of spaces, line-by-line readable
 - [x] **SettingsPanel live stats** — dynamic version from `/api/state`, live counts from `/api/stats`
 - [x] **Version pinning** — daemon.json version overwritten on load so UI never lies

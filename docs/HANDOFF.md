@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.7.3
+**Version:** v0.8.0
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -23,7 +23,11 @@ python3 backend/src/daemon.py
 
 ## What Works
 
-### v0.7.3 (current)
+### v0.8.0 (current)
+- **Mobile hamburger drawer** — hamburger icon on ≤768px, slide-in drawer from right with overlay, hides desktop tabs
+- **Responsive nav** — all tabs accessible on phone: Chat, Tasks, Timeline, Settings, Light/Dark toggle
+
+### v0.7.3
 - **DB Stats endpoint** — `/api/stats` returns message/task/pulse counts from SQLite
 - **Chat clear** — "Clear" button + Ctrl+K shortcut calls `POST /api/chat/clear`, purges DB messages
 - **Chat streaming fix** — chunks joined with `\n` instead of spaces, line-by-line readable

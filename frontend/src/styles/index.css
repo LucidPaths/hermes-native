@@ -842,14 +842,70 @@ html, body, #root {
 
 /* ===== MOBILE TABS ===== */
 @media (max-width: 768px) {
-  .tabs button {
-    padding: 4px 8px;
-    font-size: 11px;
+  .tabs { display: none; }
+  .hamburger {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: none;
+    border: 1px solid var(--border-2);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    cursor: pointer;
   }
-  .brand .ver {
-    display: none;
+  .hamburger span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--text-dim);
+    border-radius: 2px;
   }
+  .drawer-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.4);
+    z-index: 90;
+  }
+  .drawer {
+    position: fixed;
+    top: 0; right: 0;
+    width: 220px;
+    height: 100%;
+    background: var(--surface);
+    border-left: 1px solid var(--border);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px;
+    animation: slideIn 0.2s ease;
+  }
+  .drawer button {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    text-align: left;
+  }
+  .drawer button.active {
+    background: var(--surface-3);
+    border-color: var(--accent-dim);
+    color: var(--accent);
+  }
+  @keyframes slideIn {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+  }
+  .brand .ver { display: none; }
   .timeline-area, .chat-area, .task-area, .settings-area {
     height: 65vh;
   }
+}
+
+@media (min-width: 769px) {
+  .hamburger { display: none; }
 }

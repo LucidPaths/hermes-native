@@ -52,7 +52,7 @@ def load_state():
         except Exception:
             pass
     return {
-        "version": "0.7.3",
+        "version": "0.8.0",
         "booted": now(),
         "last_pulse": None,
         "next_pulse": None,

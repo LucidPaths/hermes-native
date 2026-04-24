@@ -28,6 +28,7 @@ export default function App() {
   const [state, setState] = useState<PulseState | null>(null)
   const [tab, setTab] = useState<Tab>('chat')
   const [dark, setDark] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -39,6 +40,11 @@ export default function App() {
 
   const moodColor = state?.mood?.color
 
+  const selectTab = (t: Tab) => {
+    setTab(t)
+    setMenuOpen(false)
+  }
+
   return (
     <div className={"app " + (dark ? 'dark' : 'light')}>
       <header className="topbar">
@@ -46,8 +52,13 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.7.3</span>
+          <span className="ver">v0.8.0</span>
         </div>
+        <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">
+          <span />
+          <span />
+          <span />
+        </button>
         <nav className="tabs">
           <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
           <button className={tab === 'tasks' ? 'active' : ''} onClick={() => setTab('tasks')}>Tasks</button>
@@ -56,6 +67,19 @@ export default function App() {
           <button onClick={() => setDark(!dark)}>{dark ? '☀' : '◐'}</button>
         </nav>
       </header>
+
+      {menuOpen && (
+        <>
+          <div className="drawer-overlay" onClick={() => setMenuOpen(false)} />
+          <nav className="drawer">
+            <button className={tab === 'chat' ? 'active' : ''} onClick={() => selectTab('chat')}>Chat</button>
+            <button className={tab === 'tasks' ? 'active' : ''} onClick={() => selectTab('tasks')}>Tasks</button>
+            <button className={tab === 'timeline' ? 'active' : ''} onClick={() => selectTab('timeline')}>Timeline</button>
+            <button className={tab === 'settings' ? 'active' : ''} onClick={() => selectTab('settings')}>⚙ Settings</button>
+            <button onClick={() => { setDark(!dark); setMenuOpen(false); }}>{dark ? '☀ Light' : '◐ Dark'}</button>
+          </nav>
+        </>
+      )}
 
       <main className="dashboard">
         <section className="left">
