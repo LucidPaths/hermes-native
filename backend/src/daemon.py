@@ -1,6 +1,6 @@
 """
 Hermes Native — Backend Daemon
-v0.16.0 -- stop streaming button, session persistence
+v0.17.0 -- multiline textarea, per-session draft persistence, inline message editing
 SQLite persistence for chat, tasks, pulses. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
 Mood states via mood.py (dawn/idle/working/dusk/night/error).
@@ -54,7 +54,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.16.0"  # always use current version
+            data["version"] = "0.17.0"  # always use current version
             return data
         except Exception:
             pass
@@ -829,7 +829,24 @@ async def message_delete(request):
     except Exception as e:
         return web.json_response({"error": str(e)}, status=500)
 
+# PATCH single message (edit content)
+async def message_patch(request):
+    """Update a message's content (for inline editing)."""
+    try:
+        mid = request.match_info.get("id")
+        if not mid:
+            return web.json_response({"error": "no id"}, status=400)
+        body = await request.json()
+        content = body.get("content", "").strip()
+        if not content:
+            return web.json_response({"error": "content required"}, status=400)
+        db.update_message(int(mid), content)
+        return web.json_response({"ok": True})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
 app.router.add_delete("/api/messages/{id}", message_delete)
+app.router.add_patch("/api/messages/{id}", message_patch)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware

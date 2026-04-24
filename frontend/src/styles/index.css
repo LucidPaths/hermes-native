@@ -1227,6 +1227,72 @@ html, body, #root {
     to { opacity: 1; transform: scale(1); }
   }
 
+.chat-input textarea {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+.chat-input textarea:focus { border-color: var(--accent-dim); }
+
+/* ===== MESSAGE EDITING ===== */
+.msg-edit-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.msg-edit-area {
+  background: var(--surface-3);
+  border: 1px solid var(--accent-dim);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  outline: none;
+  width: 100%;
+}
+
+.msg-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.msg-edit-btn {
+  background: var(--accent-dim);
+  border: none;
+  color: var(--void);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.msg-edit-btn:hover { background: var(--accent); }
+
+.msg-edit-btn.cancel {
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
+  color: var(--text-dim);
+}
+
+.msg-edit-btn.cancel:hover {
+  border-color: var(--hot);
+  color: var(--hot);
+}
+
 /* ===== MOBILE TABS ===== */
 @media (max-width: 768px) {
   .tabs { display: none; }

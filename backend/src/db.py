@@ -347,6 +347,17 @@ def delete_message(msg_id: int):
     conn.commit()
     conn.close()
 
+def update_message(msg_id: int, content: str):
+    """Update message content (for inline editing). Recalculates tokens."""
+    conn = sqlite3.connect(DB_PATH)
+    tokens = _count_tokens(content)
+    conn.execute(
+        "UPDATE messages SET content = ?, tokens = ?, created = ? WHERE id = ?",
+        (content, tokens, now_iso(), msg_id)
+    )
+    conn.commit()
+    conn.close()
+
 # ── Full-Text Search ────────────────────────
 
 def search_messages(query: str, limit: int = 50):

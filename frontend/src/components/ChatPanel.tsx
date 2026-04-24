@@ -76,9 +76,32 @@ function setupMarked() {
 
 setupMarked()
 
+const DRAFT_KEY = 'hermes-native:drafts'
+
+function getDraft(sid: string | null): string {
+  if (!sid) return ''
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    if (!raw) return ''
+    const map = JSON.parse(raw)
+    return map[sid] || ''
+  } catch { return '' }
+}
+
+function setDraft(sid: string | null, text: string) {
+  if (!sid) return
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY)
+    const map = raw ? JSON.parse(raw) : {}
+    map[sid] = text
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(map))
+  } catch {}
+}
+
+
 export default function ChatPanel() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'system', content: 'Hermes Native chat — v0.15.0', ts: 'boot' },
+    { role: 'system', content: 'Hermes Native chat — v0.17.0', ts: 'boot' },
   ])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -156,9 +179,65 @@ export default function ChatPanel() {
     }
   }, [currentSession])
 
+  // Draft persistence: save draft when input changes; restore on session switch
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, busy])
+    setDraft(currentSession, input)
+  }, [input, currentSession])
+
+  useEffect(() => {
+    if (currentSession) {
+      const saved = getDraft(currentSession)
+      setInput(saved)
+    }
+  }, [currentSession])
+
+  // Message inline editing
+  const [editingMsgId, setEditingMsgId] = useState<number | null>(null)
+  const [editMsgContent, setEditMsgContent] = useState('')
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const startEditMessage = (msg: Message) => {
+    if (msg.role !== 'user' || !msg.id) return
+    setEditingMsgId(msg.id)
+    setEditMsgContent(msg.content)
+  }
+
+  const saveEditMessage = async (msgId: number) => {
+    try {
+      const resp = await fetch(`/api/messages/${msgId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: editMsgContent }),
+      })
+      const data = await resp.json()
+      if (data.ok) {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: editMsgContent } : m))
+      }
+    } catch (e) {
+      console.error('edit msg', e)
+    } finally {
+      setEditingMsgId(null)
+      setEditMsgContent('')
+    }
+  }
+
+  // Auto-resize textarea helper
+  const autoResize = (el: HTMLTextAreaElement | null) => {
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = Math.min(el.scrollHeight, 200) + 'px'
+  }
+
+  useEffect(() => {
+    autoResize(textareaRef.current)
+  }, [input])
+
+  useEffect(() => {
+    if (editingMsgId !== null) {
+      const el = document.querySelector('.msg-edit-area') as HTMLTextAreaElement
+      if (el) autoResize(el)
+    }
+  }, [editMsgContent, editingMsgId])
 
   const ensureSession = async (): Promise<string | null> => {
     if (currentSession) return currentSession
@@ -323,8 +402,9 @@ export default function ChatPanel() {
     return () => window.removeEventListener('keydown', handler)
   }, [input])
 
-  const send = async () => {
-    if (!input.trim() || busy || streamingRef.current) return
+  const send = async (contentOverride?: string) => {
+    const text = (contentOverride ?? input).trim()
+    if (!text || busy || streamingRef.current) return
 
     // Auto-create session if none selected
     const activeSession = await ensureSession()
@@ -333,16 +413,20 @@ export default function ChatPanel() {
       return
     }
 
-    const userMsg: Message = { role: 'user', content: input.trim(), ts: new Date().toISOString() }
-    setMessages(prev => [...prev, userMsg])
-    setInput('')
+    // If this is a re-send (contentOverride), don't add another user bubble
+    if (!contentOverride) {
+      const userMsg: Message = { role: 'user', content: text, ts: new Date().toISOString() }
+      setMessages(prev => [...prev, userMsg])
+      setInput('')
+      setDraft(activeSession, '')
+    }
     setBusy(true)
     streamingRef.current = true
 
     // Update session title from first message if still 'Untitled' or default
     const s = sessions.find(s => s.id === activeSession)
     if (s && (s.title === 'Untitled' || s.title === 'New Session')) {
-      const autoTitle = userMsg.content.slice(0, 40)
+      const autoTitle = text.slice(0, 40)
       renameSession(activeSession, autoTitle || 'Session')
     }
 
@@ -353,18 +437,28 @@ export default function ChatPanel() {
     let streamingIndex = -1
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ message: userMsg.content, session_id: activeSession }))
+      ws.send(JSON.stringify({ message: text, session_id: activeSession }))
     }
 
     ws.onmessage = (event) => {
       try {
         const msg: WSMessage = JSON.parse(event.data)
         if (msg.type === 'start') {
-          const assistantMsg: Message = { role: 'assistant', content: '', ts: new Date().toISOString(), streaming: true }
-          setMessages(prev => {
-            streamingIndex = prev.length
-            return [...prev, assistantMsg]
-          })
+          // When re-sending (overriding), replace existing assistant msg if present at end
+          if (contentOverride && messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
+            setMessages(prev => {
+              const updated = [...prev]
+              updated[updated.length - 1] = { ...updated[updated.length - 1], content: '', streaming: true, ts: new Date().toISOString() }
+              streamingIndex = updated.length - 1
+              return updated
+            })
+          } else {
+            const assistantMsg: Message = { role: 'assistant', content: '', ts: new Date().toISOString(), streaming: true }
+            setMessages(prev => {
+              streamingIndex = prev.length
+              return [...prev, assistantMsg]
+            })
+          }
         } else if (msg.type === 'chunk') {
           setMessages(prev => {
             const updated = [...prev]
@@ -400,7 +494,7 @@ export default function ChatPanel() {
 
     ws.onerror = () => {
       ws.close()
-      fallbackHTTP(userMsg, activeSession)
+      fallbackHTTP({ content: text, ts: new Date().toISOString(), role: 'user' }, activeSession)
     }
 
     ws.onclose = () => {
@@ -576,14 +670,35 @@ export default function ChatPanel() {
             <div key={i} className={`chat-msg chat-${m.role}`}>
               <span className="chat-role">{m.role === 'system' ? '◈' : m.role === 'user' ? '◉' : '🜹'}</span>
               <div className="chat-bubble">
-                <span className={`chat-body ${m.streaming ? 'streaming' : ''}`} dangerouslySetInnerHTML={{ __html: parseMarkdown(m.content || '') }} />
+                {editingMsgId === m.id ? (
+                  <div className="msg-edit-wrap">
+                    <textarea
+                      className="msg-edit-area"
+                      rows={3}
+                      value={editMsgContent}
+                      onChange={e => setEditMsgContent(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); saveEditMessage(m.id!) }
+                        if (e.key === 'Escape') { setEditingMsgId(null); setEditMsgContent('') }
+                      }}
+                      style={{ resize: 'none', overflow: 'hidden' }}
+                    />
+                    <div className="msg-edit-actions">
+                      <button className="msg-edit-btn" onClick={() => saveEditMessage(m.id!)}>Save</button>
+                      <button className="msg-edit-btn cancel" onClick={() => { setEditingMsgId(null); setEditMsgContent('') }}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <span className={`chat-body ${m.streaming ? 'streaming' : ''}`} dangerouslySetInnerHTML={{ __html: parseMarkdown(m.content || '') }} />
+                )}
                 <span className="chat-ts">
                   {formatTime(m.ts)} {m.streaming && <span className="typing">●</span>}
                   {m.tokens !== undefined && m.tokens > 0 && <span className="token-badge">{m.tokens}t</span>}
-                  {m.id && m.role !== 'system' && (
+                  {m.id && m.role !== 'system' && editingMsgId !== m.id && (
                     <>
                       <button className="msg-act" onClick={() => copyMessage(m.content)} title="Copy message">📋</button>
                       {m.role === 'assistant' && <button className="msg-act" onClick={() => regenerateMessage(m.id)} title="Regenerate">↻</button>}
+                      {m.role === 'user' && <button className="msg-act" onClick={() => startEditMessage(m)} title="Edit">✎</button>}
                       <button className="msg-act msg-del" onClick={() => deleteMessage(m.id)} title="Delete message">×</button>
                     </>
                   )}
@@ -600,17 +715,25 @@ export default function ChatPanel() {
           <div ref={bottomRef} />
         </div>
         <div className="chat-input">
-          <input
+          <textarea
+            ref={textareaRef}
+            rows={1}
             placeholder={currentSession ? 'Say something...' : 'Start a new session...'}
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                send()
+              }
+            }}
             disabled={busy}
+            style={{ resize: 'none', overflow: 'hidden' }}
           />
           {busy ? (
-            <button onClick={stopStreaming} title="Stop">&times;</button>
+            <button onClick={stopStreaming} title="Stop">×</button>
           ) : (
-            <button onClick={send} disabled={busy}>{'🜹'}</button>
+            <button onClick={() => send()} disabled={busy}>{'🜹'}</button>
           )}
         </div>
       </div>
