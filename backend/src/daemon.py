@@ -1,23 +1,35 @@
 """
 Hermes Native — Backend Daemon
-aiohttp: REST API + SSE on :8789
+v0.4.0 — Memory Layer
+SQLite persistence for chat, tasks, pulses. Unified timeline.
+REST API + SSE on :8789
 """
 import asyncio
 import json
 import os
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 from aiohttp import web
 
+# Add src/ to path for db import
+SCRIPT_DIR = Path(__file__).resolve().parent
+sys.path.insert(0, str(SCRIPT_DIR))
+
+try:
+    import db
+except ImportError:
+    db = None
+
 STATE_DIR = Path.home() / ".hermes-native" / "state"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "daemon.json"
 LOG_FILE = STATE_DIR / "pulse.jsonl"
 
-HOST = os.getenv("HERMES_NATIVE_HOST", "127.0.0.1")
+HOST = os.getenv("HERMES_NATIVE_HOST", "0.0.0.0")
 PORT = int(os.getenv("HERMES_NATIVE_PORT", "8789"))
 FE_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
@@ -31,7 +43,7 @@ def load_state():
         except Exception:
             pass
     return {
-        "version": "0.1.0",
+        "version": "0.4.0",
         "booted": now(),
         "last_pulse": None,
         "next_pulse": None,
@@ -74,6 +86,14 @@ hub = BroadcastHub()
 state = load_state()
 state_lock = asyncio.Lock()
 
+# ── Init DB ──
+if db:
+    try:
+        db.init_db()
+        print("[db] memory.db initialized")
+    except Exception as e:
+        print(f"[db] init error: {e}")
+
 async def pulse():
     async with state_lock:
         state["last_pulse"] = now()
@@ -82,6 +102,12 @@ async def pulse():
     record = {"t": time.time(), "pulse": state["pulse_count"], "status": state["status"]}
     with open(LOG_FILE, "a") as f:
         f.write(json.dumps(record) + "\n")
+    # Persist pulse to DB
+    if db:
+        try:
+            db.save_pulse(state["pulse_count"], state["status"], dict(state))
+        except Exception as e:
+            print(f"[db] save_pulse error: {e}")
     await hub.push({"type": "pulse", "data": state})
     return state
 
@@ -130,6 +156,12 @@ async def _run_hermes_task(task_id: str, desc: str):
                     break
             state["status"] = "idle" if not [t for t in state["task_queue"] if t["status"] in ("pending","running")] else "working"
             save_state(state)
+        # Persist task completion
+        if db:
+            try:
+                db.save_task(task_id, desc, "done", response_text[:500])
+            except Exception as e:
+                print(f"[db] save_task error: {e}")
     except Exception as e:
         async with state_lock:
             for t in state["task_queue"]:
@@ -139,6 +171,11 @@ async def _run_hermes_task(task_id: str, desc: str):
                     break
             state["status"] = "idle" if not [t for t in state["task_queue"] if t["status"] in ("pending","running")] else "working"
             save_state(state)
+        if db:
+            try:
+                db.save_task(task_id, desc, "error", error=str(e)[:300])
+            except Exception as e2:
+                print(f"[db] save_task error: {e2}")
     await hub.push({"type": "state", "data": dict(state)})
 
 async def task_post(request):
@@ -153,8 +190,13 @@ async def task_post(request):
         state["task_queue"].append(task)
         state["status"] = "working" if state["task_queue"] else "idle"
         save_state(state)
+    # Persist task to DB
+    if db:
+        try:
+            db.save_task(task["id"], task["desc"], "pending")
+        except Exception as e:
+            print(f"[db] save_task init error: {e}")
     await hub.push({"type": "task", "data": task})
-    # Spawn hermes in background
     asyncio.create_task(_run_hermes_task(task["id"], task["desc"]))
     return web.json_response(task)
 
@@ -231,9 +273,19 @@ async def chat_post(request):
             cwd=str(Path.home() / "workspace"),
             env={**dict(os.environ), "TERM": "dumb", "NO_COLOR": "1", "HERMES_ACCEPT_HOOKS": "1"},
         )
-        response_text = (result.stdout or "(no output)").strip().split("\n")[-1]  # last line only
-        # Append to conversation log
-        log = {"role": "user", "msg": msg}, {"role": "assistant", "msg": response_text}
+        response_text = (result.stdout or "(no output)").strip().split("\n")[-1]
+        
+        # Persist to DB
+        if db:
+            try:
+                db.save_message("user", msg, metadata={"source": "native"})
+                db.save_message("assistant", response_text, metadata={
+                    "source": "native",
+                    "session_id": result.stderr.strip().replace("session_id: ", "") if "session_id" in result.stderr else None
+                })
+            except Exception as e:
+                print(f"[db] save_message error: {e}")
+        
         return web.json_response({
             "response": response_text,
             "session_id": result.stderr.strip().replace("session_id: ", "") if "session_id" in result.stderr else None,
@@ -243,6 +295,25 @@ async def chat_post(request):
     except Exception as e:
         return web.json_response({"response": f"Error: {e}"}, status=500)
 
+async def chat_history_get(request):
+    """Get persistent chat history from SQLite."""
+    limit = int(request.query.get("limit", "100"))
+    try:
+        msgs = db.get_messages(limit=limit) if db else []
+        return web.json_response(msgs)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def timeline_get(request):
+    """Unified timeline: messages + tasks + pulses interleaved chronologically."""
+    limit = int(request.query.get("limit", "100"))
+    try:
+        items = db.get_timeline(limit=limit) if db else []
+        return web.json_response(items)
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+# ── Routes ──
 app = web.Application()
 app.router.add_get("/", health)
 app.router.add_get("/health", health)
@@ -252,6 +323,8 @@ app.router.add_post("/api/pulse", pulse_post)
 app.router.add_post("/api/tasks", task_post)
 app.router.add_post("/api/tasks/complete", task_complete)
 app.router.add_post("/api/chat", chat_post)
+app.router.add_get("/api/chat/history", chat_history_get)
+app.router.add_get("/api/timeline", timeline_get)
 app.router.add_get("/api/history", history_get)
 app.router.add_get("/events", events)
 
