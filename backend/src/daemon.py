@@ -47,7 +47,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.7.3"  # always use current version
+            data["version"] = "0.8.1"  # always use current version
             return data
         except Exception:
             pass
@@ -471,6 +471,30 @@ async def ws_chat(request):
     
     return ws
 
+async def stats_get(request):
+    """Get DB stats — message, task, pulse counts."""
+    try:
+        s = db.get_db_stats() if db else {"messages": 0, "tasks": 0, "pulses": 0, "db_path": "unknown"}
+        return web.json_response(s)
+    except Exception as e:
+        return web.json_response({"messages": 0, "tasks": 0, "pulses": 0, "error": str(e)}, status=500)
+
+async def tunnel_status(request):
+    """Return active tunnel URL if any."""
+    import os
+    url_file = Path.home() / ".hermes-native" / "state" / "tunnel.url"
+    pid_file = Path.home() / ".hermes-native" / "state" / "tunnel.pid"
+    running = False
+    if pid_file.exists():
+        try:
+            pid = int(pid_file.read_text().strip())
+            os.kill(pid, 0)
+            running = True
+        except (ValueError, ProcessLookupError, PermissionError):
+            pass
+    url = url_file.read_text().strip() if url_file.exists() else None
+    return web.json_response({"running": running, "url": url})
+
 # ── Routes ──
 app = web.Application()
 app.router.add_get("/", index)
@@ -491,6 +515,7 @@ app.router.add_get("/ws/chat", ws_chat)
 app.router.add_get("/api/export/chat", export_chat)
 app.router.add_post("/api/chat/clear", clear_chat)
 app.router.add_get("/api/stats", stats_get)
+app.router.add_get("/api/tunnel", tunnel_status)
 
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware

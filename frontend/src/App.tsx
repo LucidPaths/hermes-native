@@ -52,7 +52,7 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.8.0</span>
+          <span className="ver">v0.8.1</span>
         </div>
         <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">
           <span />

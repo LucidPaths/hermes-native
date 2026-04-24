@@ -34,8 +34,9 @@ export default function SettingsPanel({
   const [exporting, setExporting] = useState(false)
   const [exportPath, setExportPath] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
-  const [version, setVersion] = useState<string>('v0.7.2')
+  const [version, setVersion] = useState<string>('v0.8.0')
   const [stats, setStats] = useState<any>(null)
+  const [tunnel, setTunnel] = useState<any>(null)
 
   // Load version and stats
   useEffect(() => {
@@ -48,6 +49,10 @@ export default function SettingsPanel({
     fetch('/api/stats')
       .then(r => r.json())
       .then(setStats)
+      .catch(() => {})
+    fetch('/api/tunnel')
+      .then(r => r.json())
+      .then(setTunnel)
       .catch(() => {})
   }, [])
 
@@ -143,6 +148,24 @@ export default function SettingsPanel({
         <span className="kv-key">version</span>
         <span className="kv-val">{version}</span>
       </div>
+
+      <hr style={{ border: 'none', borderTop: '1px solid var(--border)', margin: '20px 0' }} />
+
+      <h3 style={{ fontSize: 12, fontFamily: 'var(--font-mono)', color: 'var(--text-faint)', marginBottom: 12 }}>Remote Access</h3>
+      {tunnel && (
+        <>
+          <div className="kv-row">
+            <span className="kv-key">status</span>
+            <span className="kv-val" style={{ color: tunnel.running ? 'var(--accent)' : 'var(--text-faint)' }}>{tunnel.running ? 'active' : 'inactive'}</span>
+          </div>
+          {tunnel.url && (
+            <div className="kv-row">
+              <span className="kv-key">url</span>
+              <a className="kv-val" href={tunnel.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: 'var(--accent)' }}>{tunnel.url}</a>
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }

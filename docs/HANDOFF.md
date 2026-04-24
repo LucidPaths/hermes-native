@@ -1,6 +1,6 @@
 # Hermes Native — Status
 
-**Version:** v0.8.0
+**Version:** v0.8.1
 **Repo:** `github.com/LucidPaths/hermes-native`
 **Local:** `/home/lucid/workspace/hermes-native`
 
@@ -21,11 +21,11 @@ cd /home/lucid/workspace/hermes-native
 python3 backend/src/daemon.py
 ```
 
-## What Works
-
-### v0.8.0 (current)
-- **Mobile hamburger drawer** — hamburger icon on ≤768px, slide-in drawer from right with overlay, hides desktop tabs
-- **Responsive nav** — all tabs accessible on phone: Chat, Tasks, Timeline, Settings, Light/Dark toggle
+### v0.8.1 (current)
+- **Remote tunnel integration** — `scripts/tunnel.sh` wraps `npx localtunnel`, stores URL in `~/.hermes-native/state/tunnel.url`
+- **Tunnel status API** — `GET /api/tunnel` returns `{running, url}`
+- **Tunnel display in SettingsPanel** — shows active localtunnel URL with hyperlink
+- **Auto-version pinning** — daemon.json version overwritten on load so UI never lies
 
 ### v0.7.3
 - **DB Stats endpoint** — `/api/stats` returns message/task/pulse counts from SQLite

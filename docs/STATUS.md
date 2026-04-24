@@ -1,10 +1,16 @@
 # Status — Hermes Native
 
-Current: v0.8.0
+Current: v0.8.1
 
 ## What's Built ✅
 
-### v0.8.0 (current)
+### v0.8.1 (current)
+- [x] **Remote tunnel integration** — `scripts/tunnel.sh` wraps `npx localtunnel`, stores URL in `~/.hermes-native/state/tunnel.url`
+- [x] **Tunnel status API** — `GET /api/tunnel` returns `{running, url}`
+- [x] **Tunnel display in Settings** — SettingsPanel fetches `/api/tunnel`, shows active URL with hyperlink
+- [x] **Frontend rebuilt** — latest JS/CSS bundles with tunnel UI
+
+### v0.8.0
 - [x] **Mobile hamburger drawer** — hamburger icon on ≤768px, slide-in drawer from right with overlay, hides desktop tabs
 - [x] **Responsive nav** — all tabs accessible on phone: Chat, Tasks, Timeline, Settings, Light/Dark toggle
 

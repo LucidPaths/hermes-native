@@ -387,6 +387,13 @@ html, body, #root {
   color: var(--accent-dim);
   text-decoration: underline;
 }
+.settings-area a {
+  color: var(--accent-dim);
+  text-decoration: none;
+}
+.settings-area a:hover {
+  text-decoration: underline;
+}
 .chat-body ul, .chat-body ol {
   margin-left: 18px;
   margin-bottom: 8px;
