@@ -1,9 +1,9 @@
 """
 Hermes Native — Backend Daemon
-v0.17.0 -- multiline textarea, per-session draft persistence, inline message editing
-SQLite persistence for chat, tasks, pulses. Unified timeline.
+v0.18.0 — Dream Engine: idle dreaming, dream fragments, dream timeline
+SQLite persistence for chat, tasks, pulses, dreams. Unified timeline.
 Auto-archives done/error tasks from runtime state. Monotonic task IDs.
-Mood states via mood.py (dawn/idle/working/dusk/night/error).
+Mood states via mood.py (dawn/idle/working/dusk/night/error/dreaming/waking).
 Plugin hooks: pre_chat, post_chat, pre_task, post_task, on_pulse, on_mood_change.
 REST API + SSE + WS on :8789
 """
@@ -38,6 +38,11 @@ try:
 except ImportError:
     plugins = None
 
+try:
+    import dream
+except ImportError:
+    dream = None
+
 STATE_DIR = Path.home() / ".hermes-native" / "state"
 STATE_DIR.mkdir(parents=True, exist_ok=True)
 STATE_FILE = STATE_DIR / "daemon.json"
@@ -47,6 +52,100 @@ HOST = os.getenv("HERMES_NATIVE_HOST", "0.0.0.0")
 PORT = int(os.getenv("HERMES_NATIVE_PORT", "8789"))
 FE_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
+DREAM_IDLE_MIN = 15  # trigger dream after 15min idle (testing — bump to 30 in prod)
+
+async def _do_dream():
+    """Sample memories and ask Hermes to dream. Called when idle.
+    Heavy — fires subprocess. Avoid during active use.
+    """
+    if not dream:
+        return
+    async with state_lock:
+        if state.get("status") in ("working", "error", "dreaming"):
+            return
+        state["status"] = "dreaming"
+        state["_last_dream_at"] = now()
+        save_state(state)
+    await hub.push({"type": "state", "data": dict(state)})
+    
+    # sample memories
+    msgs = dream.sample_messages_for_dreaming(limit=6)
+    if not msgs:
+        async with state_lock:
+            state["status"] = "idle"
+            state["last_dream_mood"] = "empty"
+            state["last_dream_content"] = "(nothing to dream from — memory empty)"
+            save_state(state)
+        await hub.push({"type": "state", "data": dict(state)})
+        return
+    
+    prompt = dream.build_dream_prompt(msgs)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "/home/lucid/.local/bin/hermes", "chat", "-q", prompt, "-Q", "--yolo", "--source", "native-dream",
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            cwd=str(Path.home() / "workspace"),
+            env={**dict(os.environ), "TERM": "dumb", "NO_COLOR": "1"},
+        )
+        stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=120)
+        fragment = stdout.decode().strip().split("\n")[-1]
+    except Exception as e:
+        fragment = f"dream aborted: {e}"
+    
+    mood_kind = dream.classify_dream(fragment)
+    tokens = db._count_tokens(fragment) if db else len(fragment.split())
+    sources = [m.get("id") for m in msgs]
+    triggers = [m.get("content", "")[:120] for m in msgs]
+    dream_id = dream.save_dream(fragment, sources, triggers, mood=mood_kind, tokens=tokens)
+    
+    async with state_lock:
+        state["status"] = "idle"
+        state["dream_count"] = state.get("dream_count", 0) + 1
+        state["last_dream_mood"] = mood_kind
+        state["last_dream_content"] = fragment[:200]
+        save_state(state)
+    await hub.push({"type": "dream", "data": {
+        "id": dream_id,
+        "content": fragment,
+        "mood": mood_kind,
+        "tokens": tokens,
+        "created": now(),
+    }})
+    await hub.push({"type": "state", "data": dict(state)})
+
+async def dream_loop():
+    """Background coroutine: check idle → trigger dream."""
+    await asyncio.sleep(10)  # warm-up
+    while True:
+        await asyncio.sleep(60)
+        try:
+            last_pulse = state.get("last_pulse")
+            if not last_pulse:
+                continue
+            idle_min = 0
+            try:
+                then = datetime.fromisoformat(last_pulse)
+                idle_min = (datetime.now(timezone.utc) - then).total_seconds() / 60.0
+            except Exception:
+                continue
+            # Not idle enough
+            if idle_min < DREAM_IDLE_MIN:
+                continue
+            # Avoid re-dreaming too fast
+            last_dream = state.get("_last_dream_at")
+            if last_dream:
+                try:
+                    ld_then = datetime.fromisoformat(last_dream)
+                    mins_since = (datetime.now(timezone.utc) - ld_then).total_seconds() / 60.0
+                    if mins_since < DREAM_IDLE_MIN:
+                        continue
+                except Exception:
+                    pass
+            # Trigger
+            asyncio.create_task(_do_dream())
+        except Exception as e:
+            print(f"[dream_loop] {e}")
+
 def now():
     return datetime.now(timezone.utc).isoformat()
 
@@ -54,7 +153,7 @@ def load_state():
     if STATE_FILE.exists():
         try:
             data = json.loads(STATE_FILE.read_text())
-            data["version"] = "0.17.0"  # always use current version
+            data["version"] = "0.18.0"  # always use current version
             return data
         except Exception:
             pass
@@ -127,6 +226,13 @@ if db:
         print("[db] memory.db initialized")
     except Exception as e:
         print(f"[db] init error: {e}")
+
+if dream:
+    try:
+        dream.migrate_dreams_table()
+        print("[dream] dreams table initialized")
+    except Exception as e:
+        print(f"[dream] init error: {e}")
 
 # ── Mood state cache ──
 _current_mood = None
@@ -848,6 +954,27 @@ async def message_patch(request):
 app.router.add_delete("/api/messages/{id}", message_delete)
 app.router.add_patch("/api/messages/{id}", message_patch)
 
+# ── Dreams ──
+
+async def dreams_get(request):
+    """Get dream fragments."""
+    limit = int(request.query.get("limit", "50"))
+    offset = int(request.query.get("offset", "0"))
+    try:
+        items = dream.get_dreams(limit=limit, offset=offset) if dream else []
+        total = dream.get_total_dreams() if dream else 0
+        return web.json_response({"dreams": items, "total": total})
+    except Exception as e:
+        return web.json_response({"error": str(e)}, status=500)
+
+async def dream_post(request):
+    """Manually trigger a dream."""
+    asyncio.create_task(_do_dream())
+    return web.json_response({"ok": True, "status": "dreaming triggered"})
+
+app.router.add_get("/api/dreams", dreams_get)
+app.router.add_post("/api/dreams/trigger", dream_post)
+
 # CORS middleware for dev
 from aiohttp.web_middlewares import middleware
 
@@ -864,6 +991,12 @@ async def cors_middleware(request, handler):
     return resp
 
 app.middlewares.append(cors_middleware)
+
+# Startup: dream loop
+async def on_startup(app):
+    asyncio.create_task(dream_loop())
+
+app.on_startup.append(on_startup)
 
 # static from FE dist if it exists
 if FE_DIST.exists():

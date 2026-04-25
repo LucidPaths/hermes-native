@@ -1362,3 +1362,171 @@ html, body, #root {
 @media (min-width: 769px) {
   .hamburger { display: none; }
 }
+
+/* ===== DREAMS ===== */
+.dream-area {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dream-area h2 {
+  font-size: 13px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-dim);
+  margin-bottom: 0;
+}
+
+.dream-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dream-count {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
+
+.dream-trigger {
+  background: var(--surface-3);
+  border: 1px solid var(--border-2);
+  color: #a855f7;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+.dream-trigger:hover {
+  border-color: #a855f7;
+  background: #a855f722;
+}
+
+.dream-loading {
+  padding: 40px;
+  text-align: center;
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 13px;
+}
+
+.dream-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 60px 20px;
+  color: var(--text-faint);
+  font-size: 13px;
+  text-align: center;
+}
+
+.dream-empty-glyph {
+  font-size: 48px;
+  color: #a855f7;
+  opacity: 0.4;
+}
+
+.dream-empty-hint {
+  font-size: 12px;
+  max-width: 320px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
+.dream-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.dream-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+.dream-card:hover {
+  border-color: #a855f766;
+}
+.dream-card.open {
+  border-color: #a855f7;
+}
+
+.dream-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.dream-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 8px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.dream-ts {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+.dream-tokens {
+  font-size: 10px;
+  color: var(--text-faint);
+  font-family: var(--font-mono);
+}
+
+.dream-content {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+  font-style: italic;
+  border-left: 2px solid #a855f744;
+  padding-left: 12px;
+}
+
+.dream-card.open .dream-content {
+  color: var(--text);
+}
+
+.dream-triggers {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.dream-triggers-label {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  margin-bottom: 8px;
+}
+
+.dream-trigger-txt {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-style: italic;
+  line-height: 1.5;
+  padding: 4px 0;
+}

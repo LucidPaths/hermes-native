@@ -5,6 +5,7 @@ import TaskStream from './components/TaskStream'
 import ChatPanel from './components/ChatPanel'
 import MemoryTimeline from './components/MemoryTimeline'
 import SettingsPanel from './components/SettingsPanel'
+import DreamPanel from './components/DreamPanel'
 
 const SHORTCUTS: { key: string; desc: string }[] = [
   { key: 'Ctrl+/', desc: 'Show shortcuts' },
@@ -15,7 +16,7 @@ const SHORTCUTS: { key: string; desc: string }[] = [
   { key: 'Tab', desc: 'Switch panel' },
 ]
 
-type Tab = 'chat' | 'tasks' | 'timeline' | 'settings'
+type Tab = 'chat' | 'tasks' | 'timeline' | 'dreams' | 'settings'
 
 interface PulseState {
   last_pulse: string | null
@@ -96,7 +97,7 @@ export default function App() {
           <span className="glyph">🜹</span>
           <span className="title">Hermes</span>
           <span className="sub">native</span>
-          <span className="ver">v0.17.0</span>
+          <span className="ver">v0.18.0</span>
           <span className={`conn-dot ${connected ? 'conn-on' : 'conn-off'}`} title={connected ? 'Online' : 'Offline'}></span>
         </div>
         <button className="hamburger" onClick={() => setMenuOpen(!menuOpen)} aria-label="menu">
@@ -108,6 +109,7 @@ export default function App() {
           <button className={tab === 'chat' ? 'active' : ''} onClick={() => setTab('chat')}>Chat</button>
           <button className={tab === 'tasks' ? 'active' : ''} onClick={() => setTab('tasks')}>Tasks</button>
           <button className={tab === 'timeline' ? 'active' : ''} onClick={() => setTab('timeline')}>Timeline</button>
+          <button className={tab === 'dreams' ? 'active' : ''} onClick={() => setTab('dreams')}>✶</button>
           <button className={tab === 'settings' ? 'active' : ''} onClick={() => setTab('settings')}>⚙</button>
           <button onClick={() => setDark(!dark)}>{dark ? '☀' : '◐'}</button>
         </nav>
@@ -120,6 +122,7 @@ export default function App() {
             <button className={tab === 'chat' ? 'active' : ''} onClick={() => selectTab('chat')}>Chat</button>
             <button className={tab === 'tasks' ? 'active' : ''} onClick={() => selectTab('tasks')}>Tasks</button>
             <button className={tab === 'timeline' ? 'active' : ''} onClick={() => selectTab('timeline')}>Timeline</button>
+            <button className={tab === 'dreams' ? 'active' : ''} onClick={() => selectTab('dreams')}>✶ Dreams</button>
             <button className={tab === 'settings' ? 'active' : ''} onClick={() => selectTab('settings')}>⚙ Settings</button>
             <button onClick={() => { setDark(!dark); setMenuOpen(false); }}>{dark ? '☀ Light' : '◐ Dark'}</button>
           </nav>
@@ -154,6 +157,7 @@ export default function App() {
           {tab === 'chat' && <ChatPanel />}
           {tab === 'tasks' && <TaskStream />}
           {tab === 'timeline' && <MemoryTimeline />}
+          {tab === 'dreams' && <DreamPanel />}
           {tab === 'settings' && <SettingsPanel currentModel={state?.model || 'auto'} currentProvider={state?.provider || 'auto'} />}
         </section>
       </main>

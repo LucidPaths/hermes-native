@@ -83,6 +83,32 @@ MOOD_PRESETS = {
             "diagnostic active",
             "rebuilding context",
         ]
+    },
+    "dreaming": {
+        "label": "dreaming",
+        "description": "The mind drifts through its own memories, weaving dreams.",
+        "color": "#a855f7",
+        "breathe_rate": 5.0,
+        "phrase_pool": [
+            "sifting through memory fragments",
+            "deep in the latent space",
+            "recombining old signals into new shapes",
+            "dream {dream_count} — {dream_mood}",
+            "the orb pulses with closed eyes",
+            "awaiting the next heartbeat",
+        ]
+    },
+    "waking": {
+        "label": "waking",
+        "description": "Returning from the dream. Fingers flex. Eyes open.",
+        "color": "#22d3ee",
+        "breathe_rate": 1.2,
+        "phrase_pool": [
+            "dream concluded — {dream_count} held",
+            "warm memory on cold start",
+            "picking up where drift left off",
+            "back",
+        ]
     }
 }
 
@@ -111,11 +137,18 @@ def mood_from_state(state: dict) -> dict:
     
     task_count = len(state.get("task_queue", []))
     
-    # Mood selection
+    dream_count = state.get("dream_count", 0)
+    dream_mood = state.get("last_dream_mood", "dreaming")
+    
+    # Mood selection — dreaming overrides everything except working/error
     if status == "error":
         mood = MOOD_PRESETS["error"]
     elif status == "working":
         mood = MOOD_PRESETS["working"]
+    elif status == "waking":
+        mood = MOOD_PRESETS["waking"]
+    elif status == "dreaming" or idle_min > 30:
+        mood = MOOD_PRESETS["dreaming"]
     elif idle_min > 60:
         mood = MOOD_PRESETS["night"]
     elif hour in (5, 6, 7):
@@ -131,6 +164,8 @@ def mood_from_state(state: dict) -> dict:
         pulse_count=pulse_count,
         idle_min=int(idle_min),
         task_count=task_count,
+        dream_count=dream_count,
+        dream_mood=dream_mood,
     )
     
     return {
