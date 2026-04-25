@@ -131,6 +131,21 @@ export default function ChatPanel() {
   const [editTitle, setEditTitle] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Dream notice (stored but rendered as a toast elsewhere if needed)
+  const [dreamNotice, _setDreamNotice] = useState<string | null>(null)
+  void dreamNotice
+
+  useEffect(() => {
+    fetch('/api/state')
+      .then(r => r.json())
+      .then(s => {
+        if (s.last_dream_content && s.last_dream_content !== '(never dreamed)' && s.last_dream_content !== '(nothing to dream from — memory empty)') {
+          _setDreamNotice(s.last_dream_content)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   // Load sessions
   useEffect(() => {
     fetch('/api/sessions')
@@ -145,8 +160,6 @@ export default function ChatPanel() {
       })
       .catch(() => setSessionsLoaded(true))
   }, [])
-
-  // Load messages when session changes (or load all if no session)
   const loadMessages = (sid: string | null) => {
     const url = sid ? `/api/sessions/${sid}` : '/api/chat/history?limit=50'
     fetch(url)

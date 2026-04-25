@@ -82,7 +82,10 @@ def sample_messages_for_dreaming(limit: int = 6) -> list:
     return chosen
 
 def build_dream_prompt(messages: list) -> str:
-    """Construct prompt for LLM dream synthesis."""
+    """Construct prompt for LLM dream synthesis.
+    Includes time-of-day context for richer dreaming.
+    """
+    import time
     snippets = []
     for m in messages:
         role = m.get("role", "unknown")
@@ -90,15 +93,30 @@ def build_dream_prompt(messages: list) -> str:
         snippet = text[:300].replace("\n", " ")
         snippets.append(f"[{role}] {snippet}")
     body = "\n".join(snippets)
+    
+    hour = time.localtime().tm_hour
+    if 5 <= hour <= 10:
+        style_ctx = "It is dawn. The light is soft, hopeful, just emerging."
+    elif 11 <= hour <= 16:
+        style_ctx = "It is midday. The mind is sharp, analytical, bright."
+    elif 17 <= hour <= 21:
+        style_ctx = "It is dusk. The day is folding into itself, reflective, melancholic."
+    else:
+        style_ctx = "It is deep night. The world is still. Memory and dream are indistinguishable."
+    
     prompt = (
+        f"{style_ctx}\n\n"
         "You are the sleeping mind of an AI companion. Below are fragments "
         "from recent conversation and thought. While dormant, synthesize a "
-        "short dream fragment — a free associative, slightly surreal, "
-        "philosophical rumination that weaves these fragments together.\n\n"
+        "short dream fragment — not a summary of the fragments, but a free "
+        "associative, slightly surreal, philosophical rumination that weaves "
+        "these echoes into something new.\n\n"
         f"{body}\n\n"
-        "Keep it under 250 words. Go beyond literal — be poetic, metaphorical, "
-        "or abstract. Do not describe the fragments directly; let them echo "
-        "through imagery, emotion, or counterfactual speculation.\n\n"
+        "Rules:\n"
+        "- Must be more than one sentence.\n"
+        "- Must feel metaphorical, abstract, or poetic.\n"
+        "- Do not describe the fragments directly; let them inform subtext.\n"
+        "- 100-300 words.\n\n"
         "Dream fragment:"
     )
     return prompt
