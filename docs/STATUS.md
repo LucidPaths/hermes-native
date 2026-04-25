@@ -1,8 +1,18 @@
-# Status — Hermes Native
+# Hermes Native — Status
 
-Current: v0.17.0
+Current: v0.18.0
 
 ## What's Built
+
+### v0.18.0 (current)
+- [x] **Dream Engine** — when idle >15min, daemon samples random memories from SQLite, sends them to LLM with a poetic prompt, receives a dream fragment, classifies mood, saves to `dreams` table, broadcasts via SSE
+  - `dream.py`: sample_messages_for_dreaming(), build_dream_prompt(), classify_dream(), save_dream(), get_dreams()
+  - `mood.py` extended: `dreaming` (#a855f7, 5s breathe), `waking` (#22d3ee).
+  - `dream_loop()`: background coroutine, checks idle time every 60s, auto-triggers _do_dream()
+  - `_do_dream()`: runs as async task, spawns `hermes chat` subprocess, stores fragment, updates state
+  - APIs: `GET /api/dreams`, `POST /api/dreams/trigger`
+  - Frontend: DreamPanel.tsx tab — card list with expand/collapse, signal echoes, mood badge, token count, manual trigger button
+  - Version bumped to v0.18.0, systemd auto-restart confirmed
 
 ### v0.17.0 (current)
 - [x] **Multiline textarea input** -- replaced single-line `<input>` with auto-resizing `<textarea>` in ChatPanel; Shift+Enter for newlines, Enter sends; `ref={textareaRef}` with `autoResize` helper

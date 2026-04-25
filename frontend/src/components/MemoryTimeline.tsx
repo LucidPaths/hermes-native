@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 
 interface TimelineItem {
-  type: 'msg' | 'task' | 'pulse'
+  type: 'msg' | 'task' | 'pulse' | 'dream'
   t: string
   data: Record<string, any>
 }
 
-type FilterType = 'all' | 'msg' | 'task' | 'pulse'
+type FilterType = 'all' | 'msg' | 'task' | 'pulse' | 'dream'
 
 export default function MemoryTimeline() {
   const [items, setItems] = useState<TimelineItem[]>([])
@@ -31,7 +31,7 @@ export default function MemoryTimeline() {
     const handler = (e: MessageEvent) => {
       try {
         const payload = JSON.parse(e.data)
-        if (['chat', 'task', 'pulse'].includes(payload.type)) {
+        if (['chat', 'task', 'pulse', 'dream'].includes(payload.type)) {
           let item: TimelineItem | null = null
           if (payload.type === 'chat') {
             const role = payload.data.role
@@ -48,6 +48,12 @@ export default function MemoryTimeline() {
               type: 'pulse',
               t: payload.data.created || new Date().toISOString(),
               data: { pulse: payload.data.pulse_num, status: payload.data.status }
+            }
+          } else if (payload.type === 'dream') {
+            item = {
+              type: 'dream',
+              t: payload.data.created || new Date().toISOString(),
+              data: { id: payload.data.id, content: payload.data.content, mood: payload.data.mood }
             }
           }
           if (item) {
@@ -119,6 +125,17 @@ export default function MemoryTimeline() {
             <span className="tl-ts">{formatTime(item.t)}</span>
           </div>
         )
+      case 'dream':
+        return (
+          <div key={`${item.t}-${i}`} className="tl-item tl-dream">
+            <span className="tl-icon">✶</span>
+            <div className="tl-body">
+              <span className="tl-role">dream #{item.data.id} <span className="tl-dream-badge">{item.data.mood}</span></span>
+              <span className="tl-content">{(item.data.content || '').slice(0, 200)}</span>
+            </div>
+            <span className="tl-ts">{formatTime(item.t)}</span>
+          </div>
+        )
     }
   }
 
@@ -129,9 +146,9 @@ export default function MemoryTimeline() {
         <span className="tag">{filtered.length}</span>
       </h2>
       <div className="timeline-filters">
-        {(['all', 'msg', 'task', 'pulse'] as FilterType[]).map(f => (
+        {(['all', 'msg', 'task', 'pulse', 'dream'] as FilterType[]).map(f => (
           <button key={f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>
-            {f === 'all' ? 'All' : f === 'msg' ? 'Chat' : f === 'task' ? 'Tasks' : 'Pulses'}
+            {f === 'all' ? 'All' : f === 'msg' ? 'Chat' : f === 'task' ? 'Tasks' : f === 'pulse' ? 'Pulses' : 'Dreams'}
           </button>
         ))}
       </div>

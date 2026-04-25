@@ -1530,3 +1530,64 @@ html, body, #root {
   line-height: 1.5;
   padding: 4px 0;
 }
+
+/* ===== DREAMING ORB ===== */
+.orb-dreaming {
+  animation: orb-rotate 16s linear infinite, orb-dream-pulse 5s ease-in-out infinite;
+}
+
+@keyframes orb-dream-pulse {
+  0%, 100% { filter: hue-rotate(-20deg) brightness(0.6); }
+  50% { filter: hue-rotate(20deg) brightness(1.2); }
+}
+
+.orb-core.status-dreaming {
+  animation: orb-breathe-slow 5s ease-in-out infinite;
+}
+
+@keyframes orb-breathe-slow {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+
+/* ===== TIMELINE DREAMS ===== */
+.tl-dream {
+  border-left: 3px solid #a855f7;
+  background: #a855f708;
+}
+.tl-dream .tl-icon {
+  color: #a855f7;
+  font-size: 16px;
+}
+.tl-dream .tl-content {
+  font-style: italic;
+  color: var(--text-dim);
+}
+.tl-dream-badge {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  color: #a855f7cc;
+  margin-left: 6px;
+  border: 1px solid #a855f744;
+  padding: 1px 6px;
+  border-radius: 99px;
+}
+
+/* ===== DREAMING ORB ===== */
+.orb-dreaming {
+  animation: orb-rotate 16s linear infinite;
+}
+.orb-core.status-dreaming {
+  background: radial-gradient(circle at 35% 35%, #a855f7, #22d3ee);
+  box-shadow: 0 0 40px #a855f744, inset 0 0 20px #22d3ee55;
+  animation: orb-breathe-slow 5s ease-in-out infinite;
+}
+@keyframes orb-breathe-slow {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+@keyframes orb-dream-pulse {
+  0%, 100% { filter: hue-rotate(-20deg) brightness(0.6); }
+  50% { filter: hue-rotate(20deg) brightness(1.2); }
+}

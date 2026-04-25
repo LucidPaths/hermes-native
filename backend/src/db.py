@@ -232,7 +232,7 @@ def get_pulses(limit: int = 100):
 
 def get_timeline(limit: int = 100):
     """
-    Merge messages, tasks, pulses into unified chronological feed.
+    Merge messages, tasks, pulses, dreams into unified chronological feed.
     Returns list of dicts with 'type', 't', 'data'.
     """
     conn = sqlite3.connect(DB_PATH)
@@ -247,6 +247,12 @@ def get_timeline(limit: int = 100):
     # pulses
     for r in conn.execute("SELECT pulse_num, status, created FROM pulses ORDER BY created DESC LIMIT ?", (limit,)):
         items.append({"type": "pulse", "t": datetime.fromtimestamp(r["created"], tz=timezone.utc).isoformat(), "data": {"pulse": r["pulse_num"], "status": r["status"]}})
+    # dreams
+    try:
+        for r in conn.execute("SELECT id, content, mood, created FROM dreams ORDER BY created DESC LIMIT ?", (limit,)):
+            items.append({"type": "dream", "t": r["created"], "data": {"id": r["id"], "content": r["content"], "mood": r["mood"]}})
+    except Exception:
+        pass
     conn.close()
     items.sort(key=lambda x: x["t"], reverse=True)
     return items[:limit]
